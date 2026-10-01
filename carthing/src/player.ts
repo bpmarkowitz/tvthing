@@ -111,6 +111,8 @@ export class Player {
     this.hls?.destroy();
     this.playing = false;
     this.startCount += 1;
+    // Text tracks can't be removed from a <video> element, only disabled.
+    for (const track of Array.from(this.video.textTracks)) track.mode = 'disabled';
 
     const hls = new Hls({
       loader: makeLoader(this.link),
@@ -133,7 +135,13 @@ export class Player {
       highBufferWatchdogPeriod: 1,
       nudgeOffset: 0.2,
       nudgeMaxRetry: 8,
+      // No subtitles or closed captions: they're hard to read on a 4-inch screen, and the
+      // tracks attach to the <video> element, so they'd linger across channel changes.
+      enableWebVTT: false,
+      enableIMSC1: false,
+      enableCEA708Captions: false,
     });
+    hls.subtitleDisplay = false;
     this.hls = hls;
     this.lastDiscontinuity = undefined;
     this.stopSpliceWatch();

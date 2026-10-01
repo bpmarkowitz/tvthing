@@ -1,6 +1,6 @@
 {
   "name": "tvthing-carthing",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "private": true,
   "description": "TV Thing's Car Thing webapp: a full-screen video player driven by the TV Thing Mac app.",
   "license": "MIT",
