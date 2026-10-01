@@ -134,4 +134,4 @@ TV Thing is provided "as is", without warranty of any kind (see [LICENSE](LICENS
 
 - **[hls.js](https://github.com/video-dev/hls.js)** (Apache 2.0) and the **[Bridgething client](https://github.com/JoeyEamigh/bridgething)** (MIT) are bundled in the Car Thing app. Their licenses ship in the app's `licenses/` folder.
 - **Starter channels:** *Big Buck Bunny* and *Tears of Steel* are © Blender Foundation, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) ([peach.blender.org](https://peach.blender.org), [mango.blender.org](https://mango.blender.org)). Test streams are hosted by Mux, Unified Streaming, and Apple.
-- Made by Ben Markowitz. MIT licensed.
+- Made by [Ben Markowitz](https://bpmarkowitz.com). MIT licensed.

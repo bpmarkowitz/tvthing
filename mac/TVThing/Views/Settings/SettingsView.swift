@@ -38,6 +38,7 @@ struct SettingsView: View {
 
 struct AboutView: View {
     private static let repository = URL(string: "https://github.com/bpmarkowitz/tvthing")!
+    private static let website = URL(string: "https://bpmarkowitz.com")!
     private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "–"
 
     var body: some View {
@@ -66,6 +67,9 @@ struct AboutView: View {
             Section {
                 LabeledContent("Developer") {
                     Text("Ben Markowitz").foregroundStyle(.secondary)
+                }
+                LabeledContent("Website") {
+                    Link("bpmarkowitz.com", destination: Self.website)
                 }
                 LabeledContent("Source") {
                     Link("github.com/bpmarkowitz/tvthing", destination: Self.repository)
