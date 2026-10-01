@@ -40,7 +40,7 @@ struct ChannelEditorView: View {
             Form {
                 Section {
                     HStack {
-                        TextField("Stream", text: $input, prompt: Text("https://…/stream.m3u8"))
+                        TextField("Stream", text: $input, prompt: Text("https://…/stream.m3u8 or a tuner URL"))
                             .onSubmit(lookUp)
                             .onChange(of: input) { lookupError = nil }
                         if lookup != nil {
@@ -100,7 +100,7 @@ struct ChannelEditorView: View {
                 .font(.caption)
                 .foregroundStyle(.green)
         } else {
-            Text("Paste an HLS playlist URL (.m3u8), then press Return.")
+            Text("Paste an HLS playlist URL (.m3u8) or a broadcast stream URL (such as an HDHomeRun channel), then press Return.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

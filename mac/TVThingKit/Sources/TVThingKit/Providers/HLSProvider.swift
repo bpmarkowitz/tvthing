@@ -20,8 +20,16 @@ public struct HLSProvider: StreamProvider {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue("application/vnd.apple.mpegurl, application/x-mpegURL, */*", forHTTPHeaderField: "Accept")
-        let (data, response) = try await http.data(for: request)
-        guard (200...299).contains(response.statusCode), data.isHLSPlaylist else { throw ProviderError.notAPlaylist }
+        // Stream the response: a broadcast URL never ends, so give up as soon as the first
+        // bytes show it isn't a playlist (the next provider then gets a turn).
+        let (bytes, response) = try await http.bytes(for: request)
+        guard (200...299).contains(response.statusCode) else { throw ProviderError.notAPlaylist }
+        var head = Data()
+        for try await byte in bytes {
+            head.append(byte)
+            if head.count == 16 { break }
+        }
+        guard head.isHLSPlaylist else { throw ProviderError.notAPlaylist }
         return SourceCandidate(reference: .init(provider: id, value: url.absoluteString), suggestedName: Self.suggestedName(for: url))
     }
 

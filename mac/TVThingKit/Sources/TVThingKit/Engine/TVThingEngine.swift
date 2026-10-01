@@ -104,7 +104,12 @@ public actor TVThingEngine {
     /// Imports a TV Thing channel pack or M3U playlist, skipping channels already in the lineup.
     @discardableResult
     public func importChannels(from data: Data) throws -> ImportResult {
-        let channels = try ChannelPack.decode(data).makeChannels()
+        importChannels(try ChannelPack.decode(data).makeChannels())
+    }
+
+    /// Adds channels, skipping any already in the lineup.
+    @discardableResult
+    public func importChannels(_ channels: [Channel]) -> ImportResult {
         let wasEmpty = library.channels.isEmpty
         let added = library.merge(channels)
         if wasEmpty {

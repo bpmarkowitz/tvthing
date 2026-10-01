@@ -47,7 +47,7 @@ actor StreamSession {
     private var sourceRelay: HLSRelay?
     private var transcoder: FFmpegTranscoder?
     /// What FFmpeg should convert; set while preparing.
-    private var conversion = (onDemand: false, program: Int?.none)
+    private var conversion = (input: URL?.none, onDemand: false, program: Int?.none)
     private var output: (playlist: URL, relay: HLSRelay)?
     private var lastAccess = Date.now
     private var stopped = false
@@ -114,10 +114,21 @@ actor StreamSession {
         await onPhaseChange(.preparing)
         do {
             let resolved = try await environment.registry.resolve(channel.source)
-            sourceRelay = makeSourceRelay(resolved)
-            let source = try await sourcePlaylists()
-            conversion = (source.media.hasEndList, source.multivariant.flatMap(CompatibilityProbe.conversionVariant))
-            let delivery = try await chooseDelivery(source)
+            let delivery: Delivery
+            switch resolved.format {
+            case .hls:
+                sourceRelay = makeSourceRelay(resolved)
+                let source = try await sourcePlaylists()
+                conversion = (nil, source.media.hasEndList, source.multivariant.flatMap(CompatibilityProbe.conversionVariant))
+                delivery = try await chooseDelivery(source)
+            case .transportStream:
+                // Not HLS: FFmpeg reads the stream directly and is the only way to play it.
+                guard environment.ffmpeg() != nil else {
+                    throw HTTPError(status: 503, message: "Broadcast streams need FFmpeg. Install it with Homebrew: brew install ffmpeg")
+                }
+                conversion = (resolved.playlistURL, false, nil)
+                delivery = .converted(reason: "Broadcast stream")
+            }
             if case .converted = delivery { _ = try await convertedEntry(range: nil) }
             await environment.log.record("Tuned “\(channel.name)” (\(Self.describe(delivery)))", source: .mac)
             await onPhaseChange(.playing(delivery))
@@ -221,7 +232,7 @@ actor StreamSession {
         guard let executable = environment.ffmpeg() else {
             throw HTTPError(status: 503, message: "FFmpeg isn't installed.")
         }
-        let input = URL(string: environment.origin.absoluteString + "\(basePath)/source.m3u8")!
+        let input = conversion.input ?? URL(string: environment.origin.absoluteString + "\(basePath)/source.m3u8")!
         let transcoder = FFmpegTranscoder(
             executable: executable,
             source: .init(url: input, onDemand: conversion.onDemand, program: conversion.program),

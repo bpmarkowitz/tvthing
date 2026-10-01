@@ -19,6 +19,13 @@ public struct HTTPClient: Sendable {
         return (data, http)
     }
 
+    /// For streams that never end: the caller reads only as much as it needs.
+    public func bytes(for request: URLRequest) async throws -> (URLSession.AsyncBytes, HTTPURLResponse) {
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else { throw URLError(.badServerResponse) }
+        return (bytes, http)
+    }
+
     public func data(from url: URL, timeout: TimeInterval = 15) async throws -> (Data, HTTPURLResponse) {
         var request = URLRequest(url: url)
         request.timeoutInterval = timeout

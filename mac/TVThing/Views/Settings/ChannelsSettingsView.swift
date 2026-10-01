@@ -5,6 +5,7 @@ struct ChannelsSettingsView: View {
     @Environment(AppModel.self) private var model
     @State private var selection = Set<Channel.ID>()
     @State private var editor: ChannelEditorView.Mode?
+    @State private var importingFromTuner = false
 
     var body: some View {
         @Bindable var model = model
@@ -27,6 +28,9 @@ struct ChannelsSettingsView: View {
         }
         .sheet(item: $editor) { mode in
             ChannelEditorView(mode: mode)
+        }
+        .sheet(isPresented: $importingFromTuner) {
+            HDHomeRunImportView()
         }
         .alert("Something went wrong", isPresented: Binding(get: { model.alert != nil }, set: { if !$0 { model.alert = nil } })) {
             Button("OK") { model.alert = nil }
@@ -93,7 +97,11 @@ struct ChannelsSettingsView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Spacer()
-            Button("Import…") { importChannels() }
+            Menu("Import") {
+                Button("Channel Pack or M3U Playlist…") { importChannels() }
+                Button("HDHomeRun Tuner…") { importingFromTuner = true }
+            }
+            .fixedSize()
             Menu("Export") {
                 Button("All Channels…") { exportChannels(nil) }
                 Button("Selected Channels…") { exportChannels(selection) }

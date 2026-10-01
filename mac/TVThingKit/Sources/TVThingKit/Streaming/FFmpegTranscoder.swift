@@ -179,7 +179,10 @@ actor FFmpegTranscoder {
         ] + pacing + [
             "-i", source.url.absoluteString,
             "-map", "\(streams):v:0", "-map", "\(streams):a:0?",
-            "-vf", "scale=w=800:h=480:force_original_aspect_ratio=decrease:force_divisible_by=2",
+            // Deinterlace broadcast (1080i) video; progressive frames pass through untouched.
+            "-vf", "yadif=deint=interlaced,scale=w=800:h=480:force_original_aspect_ratio=decrease:force_divisible_by=2",
+            // 60 fps is needless work for the Car Thing's decoder; slower sources keep their rate.
+            "-fpsmax", "30",
             "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
             "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
             "-b:v", "700k", "-maxrate", "900k", "-bufsize", "1400k",

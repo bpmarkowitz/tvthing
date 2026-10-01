@@ -83,6 +83,39 @@ struct EngineIntegrationTests {
         await harness.shutdown()
     }
 
+    /// Needs an HDHomeRun: `TVTHING_HDHOMERUN=<ip> TVTHING_INTEGRATION=1 swift test …`
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["TVTHING_HDHOMERUN"] != nil))
+    func convertsAnHDHomeRunChannel() async throws {
+        let host = ProcessInfo.processInfo.environment["TVTHING_HDHOMERUN"]!
+        #expect(await HDHomeRun.discover().contains { $0.host == host })
+        let harness = try await Harness()
+        let channels = try await HDHomeRun.channels(at: host)
+        #expect(!channels.isEmpty)
+
+        // Pasting a channel URL is recognized as a broadcast stream, and the tuner is let go.
+        let candidate = try await harness.engine.registry.candidate(for: channels[0].source.value)
+        #expect(candidate.reference.provider == .transportStream)
+        try await Task.sleep(for: .seconds(2))
+        #expect(try await Self.tunersInUse(host) == 0)
+
+        await harness.engine.importChannels([channels[0]])
+        let (playlist, bytes) = try await harness.playThrough()
+        #expect(playlist.contains("#EXT-X-PROGRAM-DATE-TIME"))
+        #expect(bytes > 10_000)
+        #expect(try await Self.tunersInUse(host) == 1)
+
+        // Stopping releases the tuner.
+        await harness.shutdown()
+        try await Task.sleep(for: .seconds(3))
+        #expect(try await Self.tunersInUse(host) == 0)
+    }
+
+    static func tunersInUse(_ host: String) async throws -> Int {
+        let (data, _) = try await URLSession.shared.data(from: URL(string: "http://\(host)/status.json")!)
+        let tuners = try JSONSerialization.jsonObject(with: data) as? [[String: Any]] ?? []
+        return tuners.filter { $0["VctNumber"] != nil || $0["TargetIP"] != nil }.count
+    }
+
     @Test func rejectsForeignHostsAndFormPosts() async throws {
         let harness = try await Harness()
         var request = URLRequest(url: URL(string: "http://127.0.0.1:\(Self.port)/api/v1/tune")!)
