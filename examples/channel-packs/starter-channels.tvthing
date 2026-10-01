@@ -1,0 +1,10 @@
+{
+  "format" : "tvthing.channels",
+  "version" : 1,
+  "name" : "Starter Channels",
+  "channels" : [
+    { "name" : "Big Buck Bunny", "url" : "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8" },
+    { "name" : "Tears of Steel", "url" : "https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8" },
+    { "name" : "Bip Bop Test Pattern", "url" : "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_16x9/bipbop_16x9_variant.m3u8" }
+  ]
+}

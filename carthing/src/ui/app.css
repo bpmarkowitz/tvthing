@@ -1,0 +1,301 @@
+/* TV Thing on the Car Thing: 800×480, viewed at arm's length. Everything but the
+   picture is transient and sits in overlays. */
+
+:root {
+  --panel: rgba(12, 11, 16, 0.82);
+  --line: rgba(255, 255, 255, 0.82);
+  --accent: #ff8f33;
+  --muted: rgba(255, 255, 255, 0.6);
+  --font: 700 18px/1.1 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  font: var(--font);
+  cursor: none;
+  user-select: none;
+}
+
+video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #000;
+}
+
+/* Channel change: static while searching, the picture jittering under thinning static
+   while it settles, then a quick roll and flash as it locks. */
+#static {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+  image-rendering: pixelated;
+  opacity: 0;
+  pointer-events: none;
+}
+#static.on { opacity: 1; animation: flicker 0.12s steps(2, end) infinite alternate; }
+#static.on.settling { animation: static-thin 2.5s steps(14, end) forwards; }
+#static.on.locking { animation: static-out 0.45s steps(5, end) forwards; }
+
+/* Scanlines: during tuning, and always in CRT mode (a Mac setting). */
+.scanlines {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.5) 0 2px, transparent 2px 4px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+#static.on + .scanlines { opacity: 1; }
+body.crt .scanlines { opacity: 1; }
+
+video.searching { opacity: 0; }
+/* Mid-show recovery: cut to black fast, fade back in gently. */
+video { transition: opacity 0.4s ease; }
+video.blackout { opacity: 0; transition: opacity 0.1s linear; }
+/* Settling moves the picture only (cheap); color filters are kept to the brief lock. */
+video.settling { animation: settle 2.5s steps(2, end) both; }
+video.locking { animation: lock-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+
+@keyframes flicker {
+  from { opacity: 1; }
+  to { opacity: 0.88; }
+}
+@keyframes static-thin {
+  0% { opacity: 0.85; }
+  12% { opacity: 0.6; }
+  20% { opacity: 0.78; }
+  35% { opacity: 0.45; }
+  45% { opacity: 0.58; }
+  62% { opacity: 0.32; }
+  75% { opacity: 0.4; }
+  100% { opacity: 0.25; }
+}
+/* The vertical hold slipping, with a little horizontal tearing, calming down. */
+@keyframes settle {
+  0% { transform: translateY(-7%); }
+  8% { transform: translate(1.4%, 4%) skewX(-1.5deg); }
+  16% { transform: translate(-1.1%, -5%); }
+  24% { transform: translate(0.9%, 2.5%) skewX(1.2deg); }
+  34% { transform: translate(-0.6%, -3%); }
+  44% { transform: translate(0.5%, 1.6%) skewX(-0.6deg); }
+  56% { transform: translateY(-1.4%); }
+  68% { transform: translate(0.3%, 0.8%); }
+  82% { transform: translateY(-0.5%); }
+  100% { transform: translateY(0.2%); }
+}
+@keyframes static-out {
+  0% { opacity: 0.3; }
+  25% { opacity: 0.35; }
+  45% { opacity: 0.7; }
+  70% { opacity: 0.15; }
+  100% { opacity: 0; }
+}
+/* Vertical roll with overshoot, and a washed-out flash as the picture stabilizes. */
+@keyframes lock-in {
+  0% { transform: translateY(-6%) scaleY(1.03); filter: brightness(1.7) contrast(1.3) saturate(0.4); }
+  40% { transform: translateY(2%) scaleY(0.99); filter: brightness(1.3) saturate(0.75); }
+  70% { transform: translateY(-0.5%); filter: brightness(1.08); }
+  100% { transform: none; filter: none; }
+}
+
+/* Channel bug */
+.bug {
+  position: absolute;
+  top: 18px;
+  left: 20px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 72%;
+  padding: 8px 14px 8px 8px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px #000;
+  opacity: 0;
+  transform: translateY(-6px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
+}
+.bug.show { opacity: 1; transform: none; }
+.bug b {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: 6px;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 20px;
+  text-shadow: none;
+}
+.bug span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 20px; }
+
+/* Channel guide */
+.guide {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  width: 52%;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 0 18px;
+  background: linear-gradient(90deg, rgba(8, 7, 12, 0.94) 70%, rgba(8, 7, 12, 0));
+  opacity: 0;
+  transform: translateX(-24px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+.guide.show { opacity: 1; transform: none; }
+.guide header {
+  padding: 0 26px 12px;
+  color: var(--accent);
+  font-size: 15px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.guide ol {
+  flex: 1;
+  margin: 0;
+  padding: 0 16px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+.guide li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 10px;
+  color: var(--muted);
+  font-size: 21px;
+}
+.guide li.selected {
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 23px;
+}
+.guide li b { min-width: 34px; text-align: right; font-variant-numeric: tabular-nums; opacity: 0.8; }
+.guide li span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.guide li i {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 13px;
+  font-style: normal;
+  opacity: 0.7;
+}
+.guide footer { padding: 12px 26px 0; color: var(--muted); font-size: 14px; font-weight: 600; }
+
+/* Status card */
+.card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 5;
+  width: 560px;
+  max-width: calc(100% - 64px);
+  padding: 26px 30px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-radius: 18px;
+  background: var(--panel);
+  text-align: center;
+  opacity: 0;
+  transform: translate(-50%, -46%);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  pointer-events: none;
+}
+.card.show { opacity: 1; transform: translate(-50%, -50%); }
+.card strong { display: block; font-size: 28px; }
+.card p { margin: 10px 0 0; color: var(--muted); font-size: 18px; font-weight: 500; line-height: 1.35; }
+.card p:empty { display: none; }
+
+/* Volume bar, old-TV style */
+.volume {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  pointer-events: none;
+}
+.volume.show { opacity: 1; transform: translate(-50%, 0); }
+.volume span { color: #7dff9a; font-size: 15px; letter-spacing: 0.14em; }
+.volume div { display: flex; gap: 4px; }
+.volume i { width: 12px; height: 26px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); }
+.volume i.on { background: #7dff9a; box-shadow: 0 0 6px rgba(125, 255, 154, 0.6); }
+.volume b { min-width: 50px; color: #7dff9a; font-size: 20px; text-align: right; font-variant-numeric: tabular-nums; }
+.volume.muted i.on { background: rgba(125, 255, 154, 0.3); box-shadow: none; }
+
+/* Mute badge */
+.muted {
+  position: absolute;
+  right: 20px;
+  bottom: 18px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  opacity: 0;
+  transition: opacity 0.16s ease;
+  pointer-events: none;
+}
+.muted.show { opacity: 1; }
+.muted svg { width: 26px; height: 26px; fill: #fff; stroke: #fff; }
+.muted svg path:first-child { stroke: none; }
+
+/* Toast */
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: 24px;
+  z-index: 6;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--panel);
+  border: 2px solid var(--line);
+  font-size: 18px;
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translate(-50%, 0); }

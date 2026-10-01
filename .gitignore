@@ -1,0 +1,15 @@
+.DS_Store
+
+# Swift / Xcode
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+
+# Car Thing webapp
+carthing/node_modules/
+carthing/dist/
+
+# Release downloads
+/dist/
