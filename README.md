@@ -102,7 +102,7 @@ make integration   # live end-to-end tests (needs network; FFmpeg for the conver
 make release       # both downloads, zipped in dist/
 ```
 
-Or open `mac/TVThing.xcodeproj` in Xcode, choose your own team under **Signing & Capabilities**, and run the **TVThing** scheme. Build the Car Thing app first so it gets embedded.
+Builds are signed to run locally. To sign with your Apple developer team, create an untracked `Local.mk` containing `TEAM = <your team ID>`. Or open `mac/TVThing.xcodeproj` in Xcode, choose your team under **Signing & Capabilities**, and run the **TVThing** scheme. Build the Car Thing app first so it gets embedded.
 
 | Path | Contents |
 | --- | --- |

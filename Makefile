@@ -1,5 +1,7 @@
 # Common tasks. Build output goes outside the repo (iCloud-synced folders break code signing).
 BUILD_DIR ?= $(TMPDIR)tvthing-build
+# Optional, untracked: `TEAM = <your Apple team ID>` signs builds with your team.
+-include Local.mk
 
 .PHONY: all carthing test integration app release server clean
 
@@ -19,7 +21,7 @@ integration:
 
 ## The Mac app (embeds the Car Thing webapp if it has been built)
 app:
-	xcodebuild -project mac/TVThing.xcodeproj -scheme TVThing -configuration Release -derivedDataPath $(BUILD_DIR)/xcode build
+	xcodebuild -project mac/TVThing.xcodeproj -scheme TVThing -configuration Release -derivedDataPath $(BUILD_DIR)/xcode $(if $(TEAM),DEVELOPMENT_TEAM=$(TEAM)) build
 	@echo "Built $(BUILD_DIR)/xcode/Build/Products/Release/TV Thing.app"
 
 ## Downloads for a GitHub release, in dist/

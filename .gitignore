@@ -13,3 +13,6 @@ carthing/dist/
 
 # Release downloads
 /dist/
+
+# Local build settings (e.g. your signing team)
+Local.mk
