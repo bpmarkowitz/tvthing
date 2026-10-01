@@ -132,23 +132,3 @@ import Testing
         #expect(HLSProvider.suggestedName(for: URL(string: "https://x.com/classic_movies-hd/index.m3u8")!) == "Classic Movies Hd")
     }
 }
-
-@Suite struct BroadcastTests {
-    @Test func recognizesTransportStreams() {
-        var packets = Data(repeating: 0, count: TransportStreamProvider.packetSize * 3)
-        #expect(!TransportStreamProvider.isTransportStream(packets))
-        for index in 0..<3 { packets[index * TransportStreamProvider.packetSize] = TransportStreamProvider.syncByte }
-        #expect(TransportStreamProvider.isTransportStream(packets))
-        #expect(!TransportStreamProvider.isTransportStream(Data("#EXTM3U\n".utf8)))
-    }
-
-    @Test func readsHDHomeRunLineups() throws {
-        let json = #"""
-        [{"GuideNumber":"3.1","GuideName":"ABC-HD","URL":"http://10.0.0.2:5004/auto/v3.1"},
-         {"GuideNumber":"9.1","GuideName":"Locked","URL":"http://10.0.0.2:5004/auto/v9.1","DRM":1}]
-        """#
-        let channels = try HDHomeRun.channels(fromLineup: Data(json.utf8))
-        #expect(channels.map(\.name) == ["3.1 ABC-HD"])
-        #expect(channels.first?.source == SourceReference(provider: .transportStream, value: "http://10.0.0.2:5004/auto/v3.1"))
-    }
-}

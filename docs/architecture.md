@@ -9,7 +9,7 @@ TVThing (app target)              TVThingKit (Swift package)
 ─────────────────────             ───────────────────────────────────────────────
 AppModel ────────────────────────▶ TVThingEngine (actor)
   mirrors EngineSnapshot            ├─ ChannelLibrary + LibraryStore (JSON in App Support)
-  preferences                       ├─ ProviderRegistry ── HLSProvider, TransportStreamProvider, …
+  preferences                       ├─ ProviderRegistry ── HLSProvider, …
 Views (menu bar, Settings,          ├─ StreamSession (one per tune)
   welcome)                          │    ├─ HLSRelay (source)   ◀── upstream stream
 SetupMonitor                        │    ├─ CompatibilityProbe

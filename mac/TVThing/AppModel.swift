@@ -179,15 +179,6 @@ final class AppModel {
         }
     }
 
-    /// Adds an HDHomeRun tuner's whole lineup; returns a summary for the user.
-    func importHDHomeRun(at host: String) async throws -> String {
-        let channels = try await HDHomeRun.channels(at: host)
-        let result = await engine.importChannels(channels)
-        await engine.log.record("Imported \(result.added) channels from the HDHomeRun at \(host)", source: .mac)
-        let added = result.added == 1 ? "1 channel" : "\(result.added) channels"
-        return result.skipped > 0 ? "Added \(added). \(result.skipped) were already in your lineup." : "Added \(added)."
-    }
-
     /// Adds the starter channels bundled with the app: free streams broadcasters publish themselves.
     func importStarterChannels() {
         guard let url = Bundle.main.url(forResource: "Starter Channels", withExtension: ChannelPack.fileExtension) else { return }

@@ -20,8 +20,8 @@ public struct HLSProvider: StreamProvider {
         var request = URLRequest(url: url)
         request.timeoutInterval = 15
         request.setValue("application/vnd.apple.mpegurl, application/x-mpegURL, */*", forHTTPHeaderField: "Accept")
-        // Stream the response: a broadcast URL never ends, so give up as soon as the first
-        // bytes show it isn't a playlist (the next provider then gets a turn).
+        // Stream the response, and give up as soon as the first bytes show it isn't a
+        // playlist: some URLs (live video feeds) never finish downloading.
         let (bytes, response) = try await http.bytes(for: request)
         guard (200...299).contains(response.statusCode) else { throw ProviderError.notAPlaylist }
         var head = Data()

@@ -161,14 +161,14 @@ actor FFmpegTranscoder {
         throw TranscoderError.timedOut
     }
 
-    /// Records FFmpeg's messages, but summarizes floods: a weak broadcast signal makes the
+    /// Records FFmpeg's messages, but summarizes floods: a damaged source makes the
     /// decoders report hundreds of errors a second.
     private func record(_ text: String) async {
         errorTail.append(text)
         for line in text.split(separator: "\n") where !line.trimmingCharacters(in: .whitespaces).isEmpty {
             if Date.now.timeIntervalSince(logWindowStart) > Self.logWindow {
                 if suppressedLines > 0 {
-                    await log.record("FFmpeg: \(suppressedLines) more messages (lots of decoding errors usually mean a weak antenna signal)", source: .mac)
+                    await log.record("FFmpeg: \(suppressedLines) more messages (lots of decoding errors usually mean a damaged source stream)", source: .mac)
                 }
                 logWindowStart = .now
                 loggedLines = 0
@@ -185,7 +185,7 @@ actor FFmpegTranscoder {
 
     /// Runs FFmpeg (`$0 "$@"`) and stops it within a second if TV Thing goes away, however
     /// it exits; macOS has no way to tie a child's life to its parent's. Without this, a
-    /// crash could leave FFmpeg holding a TV tuner indefinitely. Stopping the shell (as
+    /// crash could leave FFmpeg running and using its source indefinitely. Stopping the shell (as
     /// `stop()` does) stops FFmpeg too, and the shell exits with FFmpeg's status.
     static let watchdog = #"""
     app=$PPID
@@ -213,7 +213,7 @@ actor FFmpegTranscoder {
         ] + pacing + [
             "-i", source.url.absoluteString,
             "-map", "\(streams):v:0", "-map", "\(streams):a:0?",
-            // Deinterlace broadcast (1080i) video; progressive frames pass through untouched.
+            // Deinterlace interlaced (1080i) video; progressive frames pass through untouched.
             "-vf", "yadif=deint=interlaced,scale=w=800:h=480:force_original_aspect_ratio=decrease:force_divisible_by=2",
             // 60 fps is needless work for the Car Thing's decoder; slower sources keep their rate.
             "-fpsmax", "30",

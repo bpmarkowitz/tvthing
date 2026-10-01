@@ -33,21 +33,12 @@ public struct SourceCandidate: Sendable, Equatable {
 }
 
 public struct ResolvedStream: Sendable {
-    public enum Format: Sendable {
-        /// An HLS playlist, relayed or converted as needed.
-        case hls
-        /// A continuous MPEG transport stream (e.g. a TV tuner), always converted by FFmpeg.
-        case transportStream
-    }
-
     public var playlistURL: URL
-    public var format: Format
     /// Applied to every upstream request made for this stream: playlists, keys, and segments.
     public var prepare: @Sendable (inout URLRequest) -> Void
 
-    public init(playlistURL: URL, format: Format = .hls, prepare: @escaping @Sendable (inout URLRequest) -> Void = { _ in }) {
+    public init(playlistURL: URL, prepare: @escaping @Sendable (inout URLRequest) -> Void = { _ in }) {
         self.playlistURL = playlistURL
-        self.format = format
         self.prepare = prepare
     }
 }
@@ -60,9 +51,9 @@ public enum ProviderError: LocalizedError, Equatable {
 
     public var errorDescription: String? {
         switch self {
-        case .unrecognizedInput: "Enter an HLS stream URL (.m3u8) or a broadcast stream URL (such as an HDHomeRun channel)."
+        case .unrecognizedInput: "Enter an HLS stream URL (.m3u8) or a supported channel link."
         case .unknownProvider(let id): "This channel uses “\(id)”, which this version of TV Thing doesn't support."
-        case .notAPlaylist: "That URL didn't return an HLS playlist or a broadcast stream."
+        case .notAPlaylist: "That URL didn't return an HLS playlist."
         case .unavailable(let reason): reason
         }
     }
@@ -70,7 +61,6 @@ public enum ProviderError: LocalizedError, Equatable {
 
 public extension ProviderID {
     static let hls: ProviderID = "hls"
-    static let transportStream: ProviderID = "mpegts"
 }
 
 /// The set of providers available to the app, in routing priority order.
@@ -81,10 +71,10 @@ public struct ProviderRegistry: Sendable {
         self.providers = providers
     }
 
-    /// Specific providers first, then the generic URL providers: an HLS playlist, or
-    /// failing that, a raw broadcast stream.
+    /// Specific providers first; the generic HLS provider catches any remaining URL,
+    /// so it must stay last.
     public static func standard(http: HTTPClient = .shared) -> ProviderRegistry {
-        ProviderRegistry(providers: [HLSProvider(http: http), TransportStreamProvider(http: http)])
+        ProviderRegistry(providers: [HLSProvider(http: http)])
     }
 
     public func provider(for id: ProviderID) throws -> any StreamProvider {

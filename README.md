@@ -2,7 +2,7 @@
 
 **Turn a Spotify Car Thing into a tiny TV.** The Car Thing shows the picture; your Mac plays the sound, kept in sync.
 
-Tune channels with the four preset buttons, turn the big knob for volume, and press it for a channel guide. Changing channels plays analog-TV static, and CRT scanlines give the picture an old-TV look (you can turn them off). TV Thing plays any HLS live stream (`.m3u8`), IPTV-style M3U playlist, or over-the-air channel from an HDHomeRun tuner that you have the right to watch.
+Tune channels with the four preset buttons, turn the big knob for volume, and press it for a channel guide. Changing channels plays analog-TV static, and CRT scanlines give the picture an old-TV look (you can turn them off). TV Thing plays any HLS live stream (`.m3u8`) or IPTV-style M3U playlist you have the right to watch.
 
 > TV Thing is an independent hobby project. It isn't affiliated with, endorsed by, or supported by Spotify, Bridgething, Apple, or any broadcaster or streaming service. See [Disclaimer](#disclaimer).
 
@@ -30,8 +30,7 @@ Tune channels with the four preset buttons, turn the big knob for volume, and pr
 
 - **Starter channels:** click **Add Starter Channels** in the welcome window or Settings → Channels. These are free live channels that broadcasters publish themselves (Al Jazeera English, Red Bull TV, PBS Kids, Africanews, CBS News Miami, Bloomberg Originals, France 24, DW, NHK World-Japan, Arirang, and Fox Weather), plus a test stream. The first six play directly; the rest need FFmpeg. Free streams can change or go offline at any time.
 - **Paste a stream URL:** Settings → Channels → **+**, paste an HLS playlist URL (`.m3u8`), and press Return.
-- **Import a playlist:** Settings → Channels → **Import → Channel Pack or M3U Playlist…** accepts IPTV-style **M3U** playlists and TV Thing **channel packs** (`.tvthing`, [format](docs/channel-packs.md)). Channels already in your lineup are skipped.
-- **Antenna TV from an HDHomeRun:** Settings → Channels → **Import → HDHomeRun Tuner…** finds your tuner on the network and adds its whole lineup (like "3.1 ABC-HD"). You can also paste a single channel URL such as `http://192.168.1.50:5004/auto/v5.1`. Broadcast channels are always converted, so they need FFmpeg, and each one you watch uses a tuner until you change channels or stop watching. Encrypted channels are skipped, and some ATSC 3.0 channels may not play.
+- **Import a playlist:** Settings → Channels → **Import…** accepts IPTV-style **M3U** playlists and TV Thing **channel packs** (`.tvthing`, [format](docs/channel-packs.md)). Channels already in your lineup are skipped.
 
 Right-click a channel to assign it to Car Thing button 1–4. Drag to reorder.
 

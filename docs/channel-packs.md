@@ -21,7 +21,7 @@ A channel pack is a JSON file (extension `.tvthing`) for sharing a lineup. Impor
 | `version` | `1`. Newer versions are rejected with a clear message |
 | `name` | Optional pack name |
 | `channels[].name` | Display name |
-| `channels[].source` | `{provider, value}`. Built-in providers are `hls` (value: playlist URL) and `mpegts` (value: a raw MPEG transport stream URL, such as an HDHomeRun channel); [custom providers](adding-a-provider.md) define their own values |
+| `channels[].source` | `{provider, value}`. The built-in provider is `hls` (value: playlist URL); [custom providers](adding-a-provider.md) define their own values |
 | `channels[].url` | Shorthand for `{"provider": "hls", "value": url}` |
 | `channels[].playback` | Optional: `automatic` (default), `direct`, or `convert` |
 
