@@ -2,7 +2,7 @@
 
 **Turn a Spotify Car Thing into a tiny TV.** The Car Thing shows the picture; your Mac plays the sound, kept in sync.
 
-Tune channels with the four preset buttons, turn the big knob for volume, and press it for a channel guide. Changing channels plays analog-TV static, and there are optional CRT scanlines. TV Thing plays any HLS live stream (`.m3u8`) or IPTV-style M3U playlist you have the right to watch.
+Tune channels with the four preset buttons, turn the big knob for volume, and press it for a channel guide. Changing channels plays analog-TV static, and CRT scanlines give the picture an old-TV look (you can turn them off). TV Thing plays any HLS live stream (`.m3u8`) or IPTV-style M3U playlist you have the right to watch.
 
 > TV Thing is an independent hobby project. It isn't affiliated with, endorsed by, or supported by Spotify, Bridgething, Apple, or any broadcaster or streaming service. See [Disclaimer](#disclaimer).
 

@@ -25,7 +25,7 @@ Rules for every request:
   "channels": [ { "id": "E6AA…", "number": 1, "name": "Big Buck Bunny", "favorite": 0 } ],
   "phase": "playing",
   "message": "Only present when phase is failed",
-  "display": { "scanlines": false },
+  "display": { "scanlines": true },
   "muted": false,
   "volume": 0.8
 }

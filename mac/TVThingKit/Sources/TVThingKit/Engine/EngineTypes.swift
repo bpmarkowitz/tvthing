@@ -73,10 +73,11 @@ public struct DeviceTimeline: Sendable, Equatable {
 /// How the Car Thing presents the picture. Owned by the app's preferences and pushed
 /// to the engine, which forwards it to the Car Thing in `/api/v1/state`.
 public struct DisplayOptions: Codable, Equatable, Sendable {
-    /// Horizontal CRT scanlines over the picture.
+    /// Horizontal CRT scanlines over the picture. On by default: they suit the small
+    /// screen and soften the look of low-resolution streams.
     public var scanlines: Bool
 
-    public init(scanlines: Bool = false) {
+    public init(scanlines: Bool = true) {
         self.scanlines = scanlines
     }
 }
