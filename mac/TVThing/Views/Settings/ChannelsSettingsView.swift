@@ -13,7 +13,7 @@ struct ChannelsSettingsView: View {
                 ContentUnavailableView {
                     Label("No Channels", systemImage: "tv")
                 } description: {
-                    Text("Add any HLS stream (.m3u8), import a channel pack or M3U playlist, or start with a few free test channels.")
+                    Text("Add any HLS stream (.m3u8), import a channel pack or M3U playlist, or start with some free channels.")
                 } actions: {
                     Button("Add Channel…") { editor = .add }
                     Button("Import…") { importChannels() }

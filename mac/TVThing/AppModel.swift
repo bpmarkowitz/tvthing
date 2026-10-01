@@ -179,7 +179,7 @@ final class AppModel {
         }
     }
 
-    /// Adds the starter channels bundled with the app (open test streams).
+    /// Adds the starter channels bundled with the app: free streams broadcasters publish themselves.
     func importStarterChannels() {
         guard let url = Bundle.main.url(forResource: "Starter Channels", withExtension: ChannelPack.fileExtension) else { return }
         importChannels(from: url)

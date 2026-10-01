@@ -28,7 +28,7 @@ Tune channels with the four preset buttons, turn the big knob for volume, and pr
 
 ## Adding channels
 
-- **Starter channels:** click **Add Starter Channels** in the welcome window or Settings → Channels. These are three free test streams (Big Buck Bunny, Tears of Steel, and Apple's Bip Bop test pattern), handy for checking everything works. They loop like a channel when FFmpeg is installed.
+- **Starter channels:** click **Add Starter Channels** in the welcome window or Settings → Channels. These are free live channels that broadcasters publish themselves (Al Jazeera English, Red Bull TV, PBS Kids, Africanews, CBS News Miami, Bloomberg Originals, France 24, DW, NHK World-Japan, Arirang, and Fox Weather), plus a test stream. The first six play directly; the rest need FFmpeg. Free streams can change or go offline at any time.
 - **Paste a stream URL:** Settings → Channels → **+**, paste an HLS playlist URL (`.m3u8`), and press Return.
 - **Import a playlist:** Settings → Channels → **Import…** accepts IPTV-style **M3U** playlists and TV Thing **channel packs** (`.tvthing`, [format](docs/channel-packs.md)). Channels already in your lineup are skipped.
 
@@ -120,7 +120,7 @@ Resize the browser to 800×480. Keys 1–4, the scroll wheel (volume), Enter (gu
 
 TV Thing is provided "as is", without warranty of any kind (see [LICENSE](LICENSE)).
 
-- **No content is included or hosted.** TV Thing is a player. It doesn't host, index, or distribute video, and it doesn't include links to copyrighted programming. The starter channels are publicly provided test streams.
+- **No content is included or hosted.** TV Thing is a player. It doesn't host or distribute video. The starter channels are links to free streams that broadcasters make publicly available themselves. All programming belongs to its owners, TV Thing isn't affiliated with any of them, and they may change or withdraw these streams at any time.
 - **Use it lawfully.** You're responsible for ensuring you have the right to access any stream you add, and for following the terms of the services and sources you use.
 - **No affiliation.** Spotify and Car Thing are trademarks of Spotify AB. Bridgething, Apple, macOS, and other names belong to their respective owners. TV Thing isn't affiliated with or endorsed by any of them.
 - **Hardware:** Car Thing is discontinued hardware, and Bridgething is third-party software. Use them at your own risk.
@@ -128,5 +128,5 @@ TV Thing is provided "as is", without warranty of any kind (see [LICENSE](LICENS
 ## Credits
 
 - **[hls.js](https://github.com/video-dev/hls.js)** (Apache 2.0) and the **[Bridgething client](https://github.com/JoeyEamigh/bridgething)** (MIT) are bundled in the Car Thing app. Their licenses ship in the app's `licenses/` folder.
-- **Starter channels:** *Big Buck Bunny* and *Tears of Steel* are © Blender Foundation, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) ([peach.blender.org](https://peach.blender.org), [mango.blender.org](https://mango.blender.org)). Test streams are hosted by Mux, Unified Streaming, and Apple.
+- **Test stream:** *Big Buck Bunny* is © Blender Foundation, licensed under [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) ([peach.blender.org](https://peach.blender.org)), hosted by Mux.
 - Made by [Ben Markowitz](https://bpmarkowitz.com). MIT licensed.
