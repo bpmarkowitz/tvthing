@@ -46,8 +46,8 @@ actor StreamSession {
     private var failedAt: Date?
     private var sourceRelay: HLSRelay?
     private var transcoder: FFmpegTranscoder?
-    /// Whether the source is a finished video rather than a live stream; set while preparing.
-    private var sourceIsOnDemand = false
+    /// What FFmpeg should convert; set while preparing.
+    private var conversion = (onDemand: false, program: Int?.none)
     private var output: (playlist: URL, relay: HLSRelay)?
     private var lastAccess = Date.now
     private var stopped = false
@@ -116,7 +116,7 @@ actor StreamSession {
             let resolved = try await environment.registry.resolve(channel.source)
             sourceRelay = makeSourceRelay(resolved)
             let source = try await sourcePlaylists()
-            sourceIsOnDemand = source.media.hasEndList
+            conversion = (source.media.hasEndList, source.multivariant.flatMap(CompatibilityProbe.conversionVariant))
             let delivery = try await chooseDelivery(source)
             if case .converted = delivery { _ = try await convertedEntry(range: nil) }
             await environment.log.record("Tuned “\(channel.name)” (\(Self.describe(delivery)))", source: .mac)
@@ -222,7 +222,11 @@ actor StreamSession {
             throw HTTPError(status: 503, message: "FFmpeg isn't installed.")
         }
         let input = URL(string: environment.origin.absoluteString + "\(basePath)/source.m3u8")!
-        let transcoder = FFmpegTranscoder(executable: executable, input: input, onDemand: sourceIsOnDemand, log: environment.log)
+        let transcoder = FFmpegTranscoder(
+            executable: executable,
+            source: .init(url: input, onDemand: conversion.onDemand, program: conversion.program),
+            log: environment.log
+        )
         self.transcoder = transcoder
         return transcoder
     }

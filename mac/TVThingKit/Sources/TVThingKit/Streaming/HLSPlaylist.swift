@@ -123,6 +123,15 @@ enum CompatibilityProbe {
         return .direct
     }
 
+    /// The variant to convert when FFmpeg is needed, as its index among all variants
+    /// (FFmpeg's program number): the best one up to 720p, which converts cleanly to 800×480.
+    static func conversionVariant(in playlist: HLSPlaylist) -> Int? {
+        let video = playlist.variants.enumerated().filter { $0.element.codecs.isEmpty || $0.element.codecs.contains { !$0.hasPrefix("mp4a") } }
+        let fitting = video.filter { ($0.element.height ?? 0) <= maximumDirectHeight }
+        let pick = fitting.max { $0.element.bandwidth < $1.element.bandwidth } ?? video.min { $0.element.bandwidth < $1.element.bandwidth }
+        return pick?.offset
+    }
+
     /// The variant the Car Thing will play: the lowest-bandwidth playable one.
     static func preferredVariant(in playlist: HLSPlaylist) -> HLSPlaylist.Variant? {
         playlist.variants.filter(isPlayable).min { $0.bandwidth < $1.bandwidth }

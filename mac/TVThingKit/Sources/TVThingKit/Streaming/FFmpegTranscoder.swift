@@ -39,20 +39,30 @@ actor FFmpegTranscoder {
 
     static let workRoot = FileManager.default.temporaryDirectory.appending(path: "TVThing-Transcodes", directoryHint: .isDirectory)
 
+    /// What to convert, and how.
+    struct Source: Sendable {
+        var url: URL
+        /// A finished video rather than a live stream: paced to real time and looped.
+        var onDemand: Bool
+        /// The source variant to convert (FFmpeg exposes each as a program), or `nil` for the first.
+        var program: Int?
+    }
+
+    /// FFmpeg finishing this soon after starting means the input is broken, not that the
+    /// video ended, so it isn't restarted.
+    private static let minimumLoopInterval: TimeInterval = 3
+
     private let executable: URL
-    private let input: URL
+    private let source: Source
     private let log: DiagnosticsLog
     private var process: Process?
     private var directory: URL?
+    private var startedAt = Date.distantPast
     private var errorTail = ErrorTail()
 
-    /// On-demand sources are read in real time and looped, so they play like a channel.
-    private let loopsOnDemandInput: Bool
-
-    init(executable: URL, input: URL, onDemand: Bool, log: DiagnosticsLog) {
-        self.loopsOnDemandInput = onDemand
+    init(executable: URL, source: Source, log: DiagnosticsLog) {
         self.executable = executable
-        self.input = input
+        self.source = source
         self.log = log
     }
 
@@ -66,10 +76,16 @@ actor FFmpegTranscoder {
         stop()
         let directory = Self.workRoot.appending(path: UUID().uuidString, directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let process = try launch(into: directory, continuing: false)
+        self.directory = directory
+        await log.record("Started FFmpeg conversion", source: .mac)
+        return try await waitForPlaylist(in: directory, process: process)
+    }
 
+    private func launch(into directory: URL, continuing: Bool) throws -> Process {
         let process = Process()
         process.executableURL = executable
-        process.arguments = Self.arguments(input: input, output: directory, onDemand: loopsOnDemandInput)
+        process.arguments = Self.arguments(source: source, output: directory, continuing: continuing)
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         let errors = Pipe()
@@ -79,23 +95,51 @@ actor FFmpegTranscoder {
             guard !data.isEmpty, let text = String(data: data, encoding: .utf8) else { return }
             Task { await self?.record(text) }
         }
+        process.terminationHandler = { [weak self] ended in
+            Task { await self?.processEnded(ended) }
+        }
         try process.run()
         self.process = process
-        self.directory = directory
-        await log.record("Started FFmpeg conversion", source: .mac)
-        return try await waitForPlaylist(in: directory, process: process)
+        startedAt = .now
+        return process
+    }
+
+    /// Loops on-demand sources: when the video ends, FFmpeg restarts and appends to the
+    /// same playlist, so players see one continuous channel. FFmpeg's own `-stream_loop`
+    /// isn't used because it retries instantly forever if its input fails, which, if
+    /// TV Thing ever died mid-conversion, would flood the local port.
+    private func processEnded(_ ended: Process) async {
+        guard ended === process, let directory, source.onDemand, ended.terminationStatus == 0 else { return }
+        guard Date.now.timeIntervalSince(startedAt) >= Self.minimumLoopInterval else {
+            await log.record("FFmpeg ended too soon to loop; stopping conversion", source: .mac)
+            return
+        }
+        do {
+            _ = try launch(into: directory, continuing: true)
+            await log.record("Looping on-demand video", source: .mac)
+        } catch {
+            await log.record("Couldn't loop: \(error.localizedDescription)", source: .mac)
+        }
     }
 
     func stop() {
+        let process = self.process
+        self.process = nil
         if let process, process.isRunning { process.terminate() }
         (process?.standardError as? Pipe)?.fileHandleForReading.readabilityHandler = nil
-        process = nil
         if let directory { try? FileManager.default.removeItem(at: directory) }
         directory = nil
     }
 
-    /// Removes output left behind if the app previously quit without cleaning up.
+    /// Stops conversions and removes output left behind if the app previously crashed or
+    /// was force-quit. Leftover FFmpeg processes are recognized by their output path, and
+    /// only orphans (now owned by launchd) are stopped, never another running instance's.
     static func removeStaleOutput() {
+        let pkill = Process()
+        pkill.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
+        pkill.arguments = ["-P", "1", "-f", workRoot.path]
+        try? pkill.run()
+        pkill.waitUntilExit()
         try? FileManager.default.removeItem(at: workRoot)
     }
 
@@ -119,16 +163,22 @@ actor FFmpegTranscoder {
         }
     }
 
-    static func arguments(input: URL, output: URL, onDemand: Bool) -> [String] {
+    static func arguments(source: Source, output: URL, continuing: Bool) -> [String] {
         // Live input arrives in real time by itself; a finished video would otherwise be
-        // converted as fast as possible and outrun the rolling playlist.
-        let pacing = onDemand ? ["-re", "-stream_loop", "-1"] : []
+        // converted as fast as possible and outrun the rolling playlist. A short initial
+        // burst fills the buffer (not again when looping, or playback would run ahead of
+        // real time), and catch-up keeps download delays from adding up.
+        let burst = continuing ? [] : ["-readrate_initial_burst", "6"]
+        let pacing = source.onDemand ? ["-readrate", "1"] + burst + ["-readrate_catchup", "1.5"] : []
+        let streams = source.program.map { "0:p:\($0)" } ?? "0"
+        // Continuing a loop appends to the existing playlist, marked as a discontinuity.
+        let flags = "delete_segments+program_date_time+independent_segments+omit_endlist" + (continuing ? "+append_list+discont_start" : "")
         return [
             "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
             "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "4",
         ] + pacing + [
-            "-i", input.absoluteString,
-            "-map", "0:v:0", "-map", "0:a:0?",
+            "-i", source.url.absoluteString,
+            "-map", "\(streams):v:0", "-map", "\(streams):a:0?",
             "-vf", "scale=w=800:h=480:force_original_aspect_ratio=decrease:force_divisible_by=2",
             "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
             "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
@@ -136,7 +186,7 @@ actor FFmpegTranscoder {
             "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
             "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "48000",
             "-f", "hls", "-hls_time", "2", "-hls_list_size", "8", "-hls_delete_threshold", "4",
-            "-hls_flags", "delete_segments+program_date_time+independent_segments+omit_endlist",
+            "-hls_flags", flags,
             "-hls_segment_filename", output.appending(path: "segment-%06d.ts").path,
             output.appending(path: "index.m3u8").path
         ]
