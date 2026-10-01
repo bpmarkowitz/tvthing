@@ -216,10 +216,6 @@ public final class CompanionAudio {
         // Every rendition carries the same audio; the smallest wastes the least bandwidth.
         item.preferredPeakBitRate = 1
         let player = AVPlayer(playerItem: item)
-        // Play whatever is buffered instead of pausing to build a safety margin: TV Thing
-        // keeps the audio aligned itself, and with streams converted live there's little
-        // buffered ahead, so waiting caused a stall, re-align, stall loop.
-        player.automaticallyWaitsToMinimizeStalling = false
         player.isMuted = isMuted
         self.player = player
         applyVolume()
