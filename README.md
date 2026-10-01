@@ -21,12 +21,7 @@ Tune channels with the four preset buttons, turn the big knob for volume, and pr
 
 1. **Download** the latest `TV-Thing-mac.zip` and `TVThing-CarThing.zip` from the [Releases page](https://github.com/bpmarkowitz/tvthing/releases).
 2. **Unzip** `TV-Thing-mac.zip` and drag **TV Thing** into your **Applications** folder.
-3. **Open TV Thing.** It isn't notarized by Apple (that needs a paid Apple developer account), so macOS blocks it the first time:
-   1. Open TV Thing, and click **Done** when macOS says it can't be opened.
-   2. Open **System Settings → Privacy & Security**, scroll down to **Security**, and click **Open Anyway** next to the TV Thing message.
-   3. Confirm with **Open Anyway** and your password. You only have to do this once.
-
-   If you prefer Terminal: `xattr -dr com.apple.quarantine "/Applications/TV Thing.app"`
+3. **Open TV Thing.** It's signed and notarized by Apple, so it opens like any other app. The first time, macOS asks you to confirm opening an app downloaded from the internet.
 4. **Find TV Thing in the menu bar** (a TV icon). A welcome window walks you through setup.
 5. **Install the Car Thing app:** with the Car Thing connected, install `TVThing-CarThing.zip` as a local app in the Bridgething desktop app. TV Thing's **Settings → Car Thing → Show Car Thing App** also reveals a copy.
 6. **Open TV Thing on the Car Thing.**

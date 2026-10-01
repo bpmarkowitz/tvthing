@@ -1,6 +1,7 @@
 # Common tasks. Build output goes outside the repo (iCloud-synced folders break code signing).
 BUILD_DIR ?= $(TMPDIR)tvthing-build
-# Optional, untracked: `TEAM = <your Apple team ID>` signs builds with your team.
+# Optional, untracked Local.mk: `TEAM = <Apple team ID>` signs builds with your team;
+# `NOTARY_PROFILE = <notarytool keychain profile>` also notarizes release downloads.
 -include Local.mk
 
 .PHONY: all carthing test integration app release server clean
@@ -26,11 +27,8 @@ app:
 
 ## Downloads for a GitHub release, in dist/
 VERSION := $(shell node -p "require('./carthing/package.json').version")
-release: carthing app
-	mkdir -p dist
-	rm -f dist/*.zip
-	ditto -c -k --keepParent "$(BUILD_DIR)/xcode/Build/Products/Release/TV Thing.app" "dist/TV-Thing-mac.zip"
-	cp carthing/dist/TVThing-CarThing.zip dist/TVThing-CarThing.zip
+release: carthing
+	BUILD_DIR="$(BUILD_DIR)" TEAM="$(TEAM)" NOTARY_PROFILE="$(NOTARY_PROFILE)" mac/Scripts/release.sh
 	@echo "Release $(VERSION) is in dist/"
 
 ## Headless engine for Car Thing development: make server PACK=examples/channel-packs/starter-channels.tvthing
