@@ -29,6 +29,7 @@ public struct HLSProvider: StreamProvider {
             head.append(byte)
             if head.count == 16 { break }
         }
+        bytes.task.cancel()
         guard head.isHLSPlaylist else { throw ProviderError.notAPlaylist }
         return SourceCandidate(reference: .init(provider: id, value: url.absoluteString), suggestedName: Self.suggestedName(for: url))
     }

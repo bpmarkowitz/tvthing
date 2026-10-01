@@ -35,6 +35,8 @@ public struct TransportStreamProvider: StreamProvider {
             head.append(byte)
             if head.count >= Self.packetSize * 3 { break }
         }
+        // Close the connection now: a tuner stays busy for as long as it's open.
+        bytes.task.cancel()
         guard Self.isTransportStream(head) else { throw ProviderError.notAPlaylist }
         return SourceCandidate(reference: .init(provider: id, value: url.absoluteString), suggestedName: nil)
     }
