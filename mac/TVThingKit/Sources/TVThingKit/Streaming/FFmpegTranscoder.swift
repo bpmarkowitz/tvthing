@@ -59,6 +59,11 @@ actor FFmpegTranscoder {
     private var directory: URL?
     private var startedAt = Date.distantPast
     private var errorTail = ErrorTail()
+    private static let logWindow: TimeInterval = 10
+    private static let linesPerWindow = 5
+    private var logWindowStart = Date.distantPast
+    private var loggedLines = 0
+    private var suppressedLines = 0
 
     init(executable: URL, source: Source, log: DiagnosticsLog) {
         self.executable = executable
@@ -84,8 +89,8 @@ actor FFmpegTranscoder {
 
     private func launch(into directory: URL, continuing: Bool) throws -> Process {
         let process = Process()
-        process.executableURL = executable
-        process.arguments = Self.arguments(source: source, output: directory, continuing: continuing)
+        process.executableURL = URL(fileURLWithPath: "/bin/sh")
+        process.arguments = ["-c", Self.watchdog, executable.path] + Self.arguments(source: source, output: directory, continuing: continuing)
         process.standardInput = FileHandle.nullDevice
         process.standardOutput = FileHandle.nullDevice
         let errors = Pipe()
@@ -156,12 +161,41 @@ actor FFmpegTranscoder {
         throw TranscoderError.timedOut
     }
 
+    /// Records FFmpeg's messages, but summarizes floods: a weak broadcast signal makes the
+    /// decoders report hundreds of errors a second.
     private func record(_ text: String) async {
         errorTail.append(text)
-        for line in text.split(separator: "\n") where !line.isEmpty {
-            await log.record("FFmpeg: \(line)", source: .mac)
+        for line in text.split(separator: "\n") where !line.trimmingCharacters(in: .whitespaces).isEmpty {
+            if Date.now.timeIntervalSince(logWindowStart) > Self.logWindow {
+                if suppressedLines > 0 {
+                    await log.record("FFmpeg: \(suppressedLines) more messages (lots of decoding errors usually mean a weak antenna signal)", source: .mac)
+                }
+                logWindowStart = .now
+                loggedLines = 0
+                suppressedLines = 0
+            }
+            if loggedLines < Self.linesPerWindow {
+                loggedLines += 1
+                await log.record("FFmpeg: \(line)", source: .mac)
+            } else {
+                suppressedLines += 1
+            }
         }
     }
+
+    /// Runs FFmpeg (`$0 "$@"`) and stops it within a second if TV Thing goes away, however
+    /// it exits; macOS has no way to tie a child's life to its parent's. Without this, a
+    /// crash could leave FFmpeg holding a TV tuner indefinitely. Stopping the shell (as
+    /// `stop()` does) stops FFmpeg too, and the shell exits with FFmpeg's status.
+    static let watchdog = #"""
+    app=$PPID
+    "$0" "$@" &
+    child=$!
+    trap 'kill $child 2>/dev/null; exit 143' TERM INT
+    while kill -0 "$app" 2>/dev/null && kill -0 "$child" 2>/dev/null; do sleep 1; done
+    kill "$child" 2>/dev/null
+    wait "$child"
+    """#
 
     static func arguments(source: Source, output: URL, continuing: Bool) -> [String] {
         // Live input arrives in real time by itself; a finished video would otherwise be
@@ -186,7 +220,8 @@ actor FFmpegTranscoder {
             "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
             "-profile:v", "main", "-level:v", "3.1", "-pix_fmt", "yuv420p",
             "-b:v", "700k", "-maxrate", "900k", "-bufsize", "1400k",
-            "-g", "48", "-keyint_min", "48", "-sc_threshold", "0",
+            // A keyframe exactly every 2 s (whatever the frame rate) gives even 2 s segments.
+            "-force_key_frames", "expr:gte(t,n_forced*2)", "-sc_threshold", "0",
             "-c:a", "aac", "-b:a", "128k", "-ac", "2", "-ar", "48000",
             "-f", "hls", "-hls_time", "2", "-hls_list_size", "8", "-hls_delete_threshold", "4",
             "-hls_flags", flags,
