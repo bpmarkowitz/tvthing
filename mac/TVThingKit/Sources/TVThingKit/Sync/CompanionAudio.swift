@@ -59,6 +59,7 @@ public final class CompanionAudio {
     private var lastDeviceActivity = Date.distantPast
     private var lastAudioTime = -1.0
     private var lastAudioProgress = Date.now
+    private var wasRebuffering = false
     /// The Car Thing's playback generation last aligned to.
     private var deviceGeneration: Int?
     /// Audio is silent while the Car Thing hides the picture, and fades in with it.
@@ -182,13 +183,32 @@ public final class CompanionAudio {
             if current.isFinite {
                 let target = CMTime(seconds: max(0, current + delta), preferredTimescale: 600)
                 await player.seek(to: target, toleranceBefore: .zero, toleranceAfter: .zero)
-                if reason == .transition {
-                    await engine.log.record("Stream transition detected; audio re-aligned", source: .mac)
+                // Silent re-alignments (while the picture is hidden) happen constantly; only
+                // audible ones are worth recording.
+                if audible {
+                    let label = switch reason {
+                    case .initial: "start"
+                    case .offsetChanged: "delay changed"
+                    case .transition: "stream transition"
+                    case .drift: "drift"
+                    }
+                    await engine.log.record("Audio re-aligned by \(Int((delta * 1_000).rounded())) ms (\(label))", source: .mac)
                 }
             }
         }
         status = .playing
+        noteRebuffering(player)
         checkForStall(item)
+    }
+
+    /// Records when the Mac's audio player runs dry and pauses to refill mid-playback.
+    private func noteRebuffering(_ player: AVPlayer) {
+        let waiting = player.timeControlStatus == .waitingToPlayAtSpecifiedRate
+        if waiting, !wasRebuffering, audible {
+            let reason = player.reasonForWaitingToPlay.map { $0.rawValue } ?? "unknown"
+            Task { await engine.log.record("Audio rebuffering (\(reason))", source: .mac) }
+        }
+        wasRebuffering = waiting
     }
 
     private func makePlayer(for url: URL) -> AVPlayer {
