@@ -21,6 +21,8 @@ const REVEAL_TIMEOUT_MS = 6_000;
 const HEALTH_RETRY_MS = 3_000;
 /** How much one knob detent changes the volume: twenty steps, like an old TV. */
 const VOLUME_STEP = 0.05;
+/** Volume reports this soon after the knob set it are the computer's rounded echo. */
+const VOLUME_ECHO_MS = 2_000;
 /** How much one knob detent shifts the sound in nudge mode. */
 const NUDGE_STEP_MS = 50;
 const NUDGE_LIMIT_MS = 5_000;
@@ -75,6 +77,7 @@ class App {
   private volume: { level: number; muted: boolean } | null = null;
   private nudgeTimer: number | undefined;
   private revealTimer: number | undefined;
+  private volumeSetAt = 0;
   private saveTimer: number | undefined;
 
   async start(): Promise<void> {
@@ -100,7 +103,15 @@ class App {
       else if (this.tuned) this.retune();
     });
     this.client.audio.onVolumeChanged(({ level, muted }) => {
-      this.volume = { level, muted };
+      // The computer rounds the volume to its own steps and reports that back. Keep the level
+      // the knob asked for unless the volume really changed (e.g. from the computer's keys),
+      // or turning down can get stuck re-rounding to the same step.
+      const close = this.volume !== null && Math.abs(level - this.volume.level) < VOLUME_STEP;
+      if (close && Date.now() - this.volumeSetAt < VOLUME_ECHO_MS) {
+        this.volume = { level: this.volume!.level, muted };
+      } else {
+        this.volume = { level, muted };
+      }
       this.screen.setMuted(muted);
     });
 
@@ -284,6 +295,7 @@ class App {
     this.volume = { level, muted };
     this.volumeBar.show(level, muted);
     this.screen.setMuted(muted);
+    this.volumeSetAt = Date.now();
     audio.setVolume({ level }).catch(() => {});
     if (wasMuted && !muted) audio.setMute({ muted: false }).catch(() => {});
   }

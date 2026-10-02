@@ -212,9 +212,13 @@ export class StreamSession {
   }
 }
 
-/** Apple's media stack (AVPlayer) names itself this way; the Car Thing's requests don't. */
-function isHostPlayer(userAgent: string): boolean {
-  return /AppleCoreMedia|AVFoundation/i.test(userAgent);
+/**
+ * Three clients load each stream: the Car Thing (through Bridgething, which names itself),
+ * FFmpeg when converting (Lavf), and Bridgething's host player (AVPlayer on a Mac, whose
+ * name varies by platform). The host player is whichever isn't one of the first two.
+ */
+export function isHostPlayer(userAgent: string): boolean {
+  return !/^(bridgething|Lavf)\//i.test(userAgent);
 }
 
 /** The program-date-time of a media playlist's first segment, worked back from the first stamp. */
