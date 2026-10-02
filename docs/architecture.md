@@ -41,7 +41,7 @@ Bridgething's host player can't be moved once it's playing a live stream; seeks 
 
 - **Comparing positions.** The two players count position from different places (each from the first segment it happened to load, and live playlists roll forward every few seconds), so raw positions can't be compared. Instead they're compared on the stream's own clock, its program-date-time stamps. hls.js gives the picture's directly. For the sound, the extension notes the stamp of the first segment in the first playlist it serves the host player (the client that isn't the Car Thing or FFmpeg), and the host player's position counts from there.
 - **Moving the picture.** The picture plays about four segments behind the live edge, so there's buffered video on both sides of it. When the two drift apart, the picture jumps forward or steps back within that buffer.
-- **When to move.** When a channel starts, the tuning static stays up until the picture is in step (6 s at most), so it appears already aligned. After that, only gaps over 300 ms are corrected (position reports carry a couple hundred milliseconds of jitter), at most every 20 s, or every 4 s for gaps over a second (after the picture rebuffers, say). Finer adjustments are left to the viewer's sound timing control, which shifts the target.
+- **When to move.** When a channel starts, the picture appears as soon as it's playing and jumps into step with the sound a couple of seconds later. After that, only gaps over 300 ms are corrected (position reports carry a couple hundred milliseconds of jitter), at most every 20 s, or every 4 s for gaps over a second (after the picture rebuffers, say). Finer adjustments are left to the viewer's sound timing control, which shifts the target.
 
 ## The Car Thing app
 

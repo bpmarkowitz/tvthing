@@ -16,8 +16,6 @@ import { VolumeBar } from './ui/volume';
 declare const __APP_VERSION__: string;
 
 const SYNC_INTERVAL_MS = 500;
-/** The longest the static stays up waiting for the picture to line up with the sound. */
-const REVEAL_TIMEOUT_MS = 6_000;
 const HEALTH_RETRY_MS = 3_000;
 /** How much one knob detent changes the volume: twenty steps, like an old TV. */
 const VOLUME_STEP = 0.05;
@@ -53,7 +51,6 @@ class App {
     this.link,
     (message) => this.link.log(message),
     (ms) => this.player.shift(ms),
-    () => this.revealPicture(),
   );
   private readonly screen = new Screen();
   private readonly guide = new Guide();
@@ -76,7 +73,6 @@ class App {
   private tuneGeneration = 0;
   private volume: { level: number; muted: boolean } | null = null;
   private nudgeTimer: number | undefined;
-  private revealTimer: number | undefined;
   private volumeSetAt = 0;
   private saveTimer: number | undefined;
 
@@ -158,8 +154,6 @@ class App {
     const generation = ++this.tuneGeneration;
     this.store.setCurrent(channel.id);
     this.screen.hideCard();
-    window.clearTimeout(this.revealTimer);
-    this.revealTimer = undefined;
     this.screen.startTuning();
     const info = this.store.info(channel.id);
     if (info) this.screen.showChannel(info);
@@ -184,19 +178,10 @@ class App {
 
   /** The picture is moving: (re)start the sound from the same playlist, then line it up. */
   private pictureStarted(): void {
-    this.screen.hideCard();
-    if (this.tuned && !this.sound.isActive) this.sound.play(this.tuned.playlist, this.tuned.session);
-    // Keep the static (or black) up until the picture is in step with the sound, like a TV
-    // locking on; give up waiting after a few seconds, e.g. for streams with no timestamps.
-    if (this.screen.pictureVisible || this.revealTimer !== undefined) return;
-    this.revealTimer = window.setTimeout(() => this.revealPicture(), REVEAL_TIMEOUT_MS);
-  }
-
-  private revealPicture(): void {
-    window.clearTimeout(this.revealTimer);
-    this.revealTimer = undefined;
     this.screen.lockSignal();
     this.screen.revealAfterRecovery();
+    this.screen.hideCard();
+    if (this.tuned && !this.sound.isActive) this.sound.play(this.tuned.playlist, this.tuned.session);
   }
 
   private libraryChanged(): void {
