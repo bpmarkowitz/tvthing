@@ -118,19 +118,23 @@ export class Player {
   }
 
   /**
-   * Steps the picture back by up to a few seconds within what's already buffered, so the
-   * sound can catch up with it. Skipped if that part of the stream isn't buffered any more.
+   * Moves the picture by `ms` (positive is later in the stream) within what's already
+   * buffered, so it lines up with the sound. Moves as far as the buffer allows.
    */
-  holdBack(ms: number): void {
-    const target = this.video.currentTime - Math.min(ms, 3_000) / 1_000;
-    const { buffered } = this.video;
+  shift(ms: number): void {
+    const { buffered, currentTime } = this.video;
     for (let index = 0; index < buffered.length; index += 1) {
-      if (target >= buffered.start(index) && target <= buffered.end(index)) {
-        this.video.currentTime = target;
-        return;
+      const start = buffered.start(index);
+      const end = buffered.end(index);
+      if (currentTime < start || currentTime > end) continue;
+      // Stay a little inside the buffer so playback doesn't stall at its edge.
+      const target = Math.min(end - 0.5, Math.max(start + 0.1, currentTime + ms / 1_000));
+      if (Math.abs(target - currentTime) * 1_000 < Math.abs(ms) - 50) {
+        this.link.log(`Picture could only move ${Math.round((target - currentTime) * 1_000)} of ${Math.round(ms)} ms (buffered ${start.toFixed(1)}–${end.toFixed(1)} s at ${currentTime.toFixed(1)} s)`);
       }
+      if (Math.abs(target - currentTime) > 0.02) this.video.currentTime = target;
+      return;
     }
-    this.link.log(`Couldn't hold the picture back ${Math.round(ms)} ms: not buffered`);
   }
 
   /** Nudges a paused video, e.g. after the user touches the screen. */

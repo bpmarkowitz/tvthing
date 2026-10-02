@@ -1,26 +1,19 @@
 import type { BridgethingClient } from '@bridgething/client';
 import type { ExtensionLink } from './link';
 
-/** Seeking costs a moment of silence, so small differences are left alone. */
-const DRIFT_THRESHOLD_MS = 250;
-/** Consecutive out-of-sync checks before re-aligning, so one jittery report is ignored. */
+/** Moving the picture costs a small hitch, so small differences are left alone. */
+const DRIFT_THRESHOLD_MS = 200;
+/** Consecutive out-of-sync checks before acting, so one jittery reading is ignored. */
 const DRIFT_SAMPLES = 3;
-/** Automatic re-aligns are at most this frequent. */
+/** Picture moves for slow drift are at most this frequent. */
 const DRIFT_COOLDOWN_MS = 20_000;
-/** A difference this large (e.g. the host player rebuffered) is fixed sooner. */
-const JUMP_THRESHOLD_MS = 2_000;
-const JUMP_COOLDOWN_MS = 5_000;
-/** After starting or seeking, the host player's reports take a moment to settle. */
+/** A difference this large (e.g. the picture rebuffered) is fixed sooner. */
+const JUMP_THRESHOLD_MS = 1_000;
+const JUMP_COOLDOWN_MS = 4_000;
+/** After starting or moving the picture, readings take a moment to settle. */
 const SETTLE_MS = 2_000;
-/**
- * A seek takes a moment to land, and the sound resumes from the requested point only then,
- * so seeks aim ahead by this much. It's learned from where each seek lands (and remembered).
- */
-const INITIAL_SEEK_LEAD_MS = 300;
-const MAXIMUM_SEEK_LEAD_MS = 1_500;
-const SEEK_LEAD_KEY = 'sound:seekLead';
-/** After a seek, a miss larger than this is corrected straight away (a few times at most). */
-const MISS_TOLERANCE_MS = 100;
+/** After a move, a miss larger than this is corrected straight away (a few times at most). */
+const MISS_TOLERANCE_MS = 120;
 const QUICK_RETRIES = 2;
 const POLL_MS = 1_000;
 /** How often the measured difference is logged, for troubleshooting sync. */
@@ -35,7 +28,8 @@ interface HostReport {
 
 /**
  * The sound, played on the computer by Bridgething's host player from the same playlist as
- * the picture, and kept in line with it.
+ * the picture. The host player can't be moved once it's playing a live stream (seeks are
+ * ignored), so the sound plays straight through and the picture follows it.
  *
  * The two players count position from different places (each from the first segment it
  * happened to load), so positions are compared as program-date-time: the picture's comes from
@@ -48,39 +42,24 @@ export class Sound {
   /** Program-date-time (Unix ms) of the host player's position 0, once the extension knows. */
   private origin: number | null = null;
   private host: HostReport | null = null;
-  private playingSince: number | null = null;
+  private settledAt: number | null = null;
   private aligned = false;
-  private lastAlignAt = 0;
+  private lastMoveAt = 0;
   private driftCount = 0;
   private offsetMs = 0;
   private lastReportAt = 0;
-  private seekLeadMs = loadSeekLead();
-  /** The position last sought to: Bridgething echoes it straight back, which isn't a real report. */
-  private soughtTo: { positionMs: number; at: number } | null = null;
-  /**
-   * After a seek, polled state is Bridgething's guess (the requested position plus time since)
-   * until the player itself reports in, so polls are ignored until the next pushed report.
-   */
-  private awaitingPush = false;
-  /** Set after a seek, until where it landed has been checked. */
-  private checkingSeek = false;
+  /** Set after moving the picture, until where it landed has been checked. */
+  private checkingMove = false;
   private retries = 0;
-  /** The difference just before the last seek, to tell whether the seek did anything. */
-  private beforeSeek = 0;
-  /**
-   * Set once a seek forward has had no effect: the host player is as close to the live edge
-   * as it will go. From then on the picture waits for the sound instead.
-   */
-  private forwardBlocked = false;
 
   constructor(
     private readonly client: BridgethingClient,
     private readonly link: ExtensionLink,
     private readonly log: (message: string) => void,
-    /** Holds the picture back by this many milliseconds, for when the sound can't catch up. */
-    private readonly delayPicture: (ms: number) => void,
+    /** Moves the picture by this many milliseconds (positive is later in the stream). */
+    private readonly movePicture: (ms: number) => void,
   ) {
-    client.player.onSnapshot((reply) => this.record(reply.state.playback, 'push'));
+    client.player.onSnapshot((reply) => this.record(reply.state.playback));
     window.setInterval(() => this.poll(), POLL_MS);
   }
 
@@ -88,18 +67,15 @@ export class Sound {
     return this.url !== null;
   }
 
-  /** Starts the sound from the playlist; `follow` then lines it up with the picture. */
+  /** Starts the sound from the playlist; `follow` then lines the picture up with it. */
   async play(url: string, sessionID: string): Promise<void> {
     this.url = url;
     this.sessionID = sessionID;
     this.origin = null;
     this.host = null;
-    this.playingSince = null;
+    this.settledAt = null;
     this.aligned = false;
-    this.checkingSeek = false;
-    this.soughtTo = null;
-    this.awaitingPush = false;
-    this.forwardBlocked = false;
+    this.checkingMove = false;
     this.driftCount = 0;
     // The extension notes where the host player starts as it loads; forget the last load.
     await this.link.resetHostTimeline(sessionID).catch(() => {});
@@ -115,6 +91,12 @@ export class Sound {
     this.client.player.pause().catch(() => {});
   }
 
+  /** The picture is reloading; line it up with the sound again once it's back. */
+  realign(): void {
+    this.aligned = false;
+    this.checkingMove = false;
+  }
+
   /** Positive plays the sound later than the picture. Applied at once. */
   setOffset(ms: number): void {
     if (ms === this.offsetMs) return;
@@ -124,78 +106,52 @@ export class Sound {
 
   /**
    * Call regularly with the program-date-time of the frame on screen (null if unknown);
-   * re-aligns the sound when it has drifted.
+   * moves the picture when it has drifted from the sound.
    */
   follow(pictureDate: number | null, picturePlaying: boolean): void {
     const host = this.hostPosition();
-    if (!this.url || !picturePlaying || pictureDate === null || this.origin === null || host === null || this.playingSince === null) return;
-    if (Date.now() - this.playingSince < SETTLE_MS) return;
-    const target = pictureDate - this.offsetMs - this.origin;
-    const difference = host - target;
+    if (!this.url || !picturePlaying || pictureDate === null || this.origin === null || host === null || this.settledAt === null) return;
+    if (Date.now() - this.settledAt < SETTLE_MS) return;
+    // How far the picture is from where it should be: in step with the sound, adjusted by the
+    // viewer's offset (a positive offset plays the sound later, so the picture runs ahead).
+    const difference = this.origin + host + this.offsetMs - pictureDate;
     const magnitude = Math.abs(difference);
-    const sinceAlign = Date.now() - this.lastAlignAt;
     if (Date.now() - this.lastReportAt >= REPORT_MS) {
       this.lastReportAt = Date.now();
-      this.log(`Sync: sound ${describe(difference)} (host at ${Math.round(host)} ms, picture at ${Math.round(target)} ms on the host's timeline)`);
+      this.log(`Sync: picture ${describe(difference)}`);
     }
     if (!this.aligned) {
       this.retries = 0;
-      this.align(target, difference, 'start');
+      this.move(difference, 'start');
       return;
     }
-    if (this.checkingSeek) {
-      this.checkingSeek = false;
-      if (this.beforeSeek < 0 && Math.abs(difference - this.beforeSeek) < MISS_TOLERANCE_MS) {
-        // The seek forward did nothing, so the picture waits for the sound instead.
-        this.forwardBlocked = true;
-        this.log(`Sound can't go further ahead; holding the picture back ${Math.round(magnitude)} ms`);
-        this.delayPicture(magnitude);
-        this.settle();
-        return;
-      }
-      // Learn how far ahead to aim from where the seek landed, and fix a clear miss now.
-      this.seekLeadMs = Math.max(0, Math.min(MAXIMUM_SEEK_LEAD_MS, Math.round(this.seekLeadMs - difference)));
-      saveSeekLead(this.seekLeadMs);
-      this.log(`Seek landed ${describe(difference)}; aiming ${this.seekLeadMs} ms ahead from now on`);
+    if (this.checkingMove) {
+      this.checkingMove = false;
       if (magnitude > MISS_TOLERANCE_MS && this.retries < QUICK_RETRIES) {
         this.retries += 1;
-        this.align(target, difference, 'retry');
+        this.move(difference, 'retry');
       }
       return;
     }
     this.driftCount = magnitude > DRIFT_THRESHOLD_MS ? this.driftCount + 1 : 0;
     if (this.driftCount < DRIFT_SAMPLES) return;
-    if (magnitude > JUMP_THRESHOLD_MS ? sinceAlign >= JUMP_COOLDOWN_MS : sinceAlign >= DRIFT_COOLDOWN_MS) {
+    const sinceMove = Date.now() - this.lastMoveAt;
+    if (magnitude > JUMP_THRESHOLD_MS ? sinceMove >= JUMP_COOLDOWN_MS : sinceMove >= DRIFT_COOLDOWN_MS) {
       this.retries = 0;
-      this.align(target, difference, 'drift');
+      this.move(difference, 'drift');
     }
   }
 
-  private align(target: number, difference: number, reason: string): void {
+  /** Moves the picture by `difference`: positive means it's behind, so it jumps forward. */
+  private move(difference: number, reason: string): void {
     this.aligned = true;
-    this.lastAlignAt = Date.now();
     this.driftCount = 0;
     if (Math.abs(difference) < 40) return;
-    if (difference < 0 && this.forwardBlocked) {
-      this.log(`Holding the picture back ${Math.round(-difference)} ms (${reason})`);
-      this.delayPicture(-difference);
-      this.settle();
-      return;
-    }
-    this.settle();
-    this.checkingSeek = true;
-    this.beforeSeek = difference;
-    const aim = Math.max(0, Math.round(target + this.seekLeadMs));
-    this.soughtTo = { positionMs: aim, at: Date.now() };
-    this.awaitingPush = true;
-    this.log(`Aligning sound (${reason}, ${describe(difference)}): seek to ${aim} ms`);
-    this.client.player.seekTo({ positionMs: aim }).catch(() => {});
-  }
-
-  /** Readings until a seek or picture shift lands would read as more drift. */
-  private settle(): void {
-    this.playingSince = Date.now();
-    this.lastAlignAt = Date.now();
+    this.lastMoveAt = Date.now();
+    this.settledAt = Date.now();
+    this.checkingMove = true;
+    this.log(`Moving the picture ${difference > 0 ? 'ahead' : 'back'} ${Math.round(Math.abs(difference))} ms to match the sound (${reason})`);
+    this.movePicture(difference);
   }
 
   private hostPosition(): number | null {
@@ -215,49 +171,21 @@ export class Sound {
     }
     try {
       const reply = await this.client.player.stateGet({ timeoutMs: 2_000 });
-      if (reply.ok) this.record(reply.response.state.playback, 'poll');
+      if (reply.ok) this.record(reply.response.state.playback);
     } catch {
       // Keep the last report.
     }
   }
 
-  private record(playback: { state: string; positionMs: number; positionAgeMs: number | null }, source: string): void {
+  private record(playback: { state: string; positionMs: number; positionAgeMs: number | null }): void {
     if (!this.url) return;
     const playing = playback.state === 'playing';
-    // Right after a seek, Bridgething reports the requested position before the player gets there.
-    const echo = this.soughtTo && playback.positionMs === this.soughtTo.positionMs && Date.now() - this.soughtTo.at < 3_000;
-    if (echo) return;
-    if (source === 'poll' && this.awaitingPush) return;
-    if (source === 'push') this.awaitingPush = false;
-    // Troubleshooting: note reports that don't continue from the previous one.
-    const expected = this.hostPosition();
-    const reported = playback.positionMs + (playback.positionAgeMs ?? 0);
-    if (expected === null || !playing || Math.abs(reported - expected) > 300) {
-      this.log(`Host ${source}: ${playback.state} at ${playback.positionMs} ms, age ${playback.positionAgeMs ?? 'none'}${expected === null ? '' : `, expected ${Math.round(expected)}`}`);
-    }
-    if (playing && this.playingSince === null) this.playingSince = Date.now();
-    if (!playing) this.playingSince = null;
+    if (playing && this.settledAt === null) this.settledAt = Date.now();
+    if (!playing) this.settledAt = null;
     this.host = { positionMs: playback.positionMs, ageMs: playback.positionAgeMs ?? 0, playing, at: Date.now() };
   }
 }
 
 function describe(difference: number): string {
-  return `${difference >= 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms`;
-}
-
-function loadSeekLead(): number {
-  try {
-    const stored = Number(localStorage.getItem(SEEK_LEAD_KEY));
-    return Number.isFinite(stored) && stored > 0 ? Math.min(stored, MAXIMUM_SEEK_LEAD_MS) : INITIAL_SEEK_LEAD_MS;
-  } catch {
-    return INITIAL_SEEK_LEAD_MS;
-  }
-}
-
-function saveSeekLead(ms: number): void {
-  try {
-    localStorage.setItem(SEEK_LEAD_KEY, String(ms));
-  } catch {
-    // Not remembered; it's learned again next time.
-  }
+  return `${difference >= 0 ? 'behind' : 'ahead of'} the sound by ${Math.round(Math.abs(difference))} ms`;
 }

@@ -48,7 +48,7 @@ class App {
     this.client,
     this.link,
     (message) => this.link.log(message),
-    (ms) => this.player.holdBack(ms),
+    (ms) => this.player.shift(ms),
   );
   private readonly screen = new Screen();
   private readonly guide = new Guide();
@@ -59,10 +59,10 @@ class App {
     this.link,
     () => this.pictureStarted(),
     // Like a TV station's break: cut to black, and come back only once the picture is
-    // clean. The sound stops with the picture and restarts with it.
+    // clean. The sound keeps playing, and the picture rejoins it when it comes back.
     () => {
       this.screen.blackout();
-      this.sound.stop();
+      this.sound.realign();
     },
     (message) => this.screen.showCard(this.store.current?.name ?? 'Can’t play this channel', message),
   );
