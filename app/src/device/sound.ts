@@ -57,14 +57,28 @@ export class Sound {
   private seekLeadMs = loadSeekLead();
   /** The position last sought to: Bridgething echoes it straight back, which isn't a real report. */
   private soughtTo: { positionMs: number; at: number } | null = null;
+  /**
+   * After a seek, polled state is Bridgething's guess (the requested position plus time since)
+   * until the player itself reports in, so polls are ignored until the next pushed report.
+   */
+  private awaitingPush = false;
   /** Set after a seek, until where it landed has been checked. */
   private checkingSeek = false;
   private retries = 0;
+  /** The difference just before the last seek, to tell whether the seek did anything. */
+  private beforeSeek = 0;
+  /**
+   * Set once a seek forward has had no effect: the host player is as close to the live edge
+   * as it will go. From then on the picture waits for the sound instead.
+   */
+  private forwardBlocked = false;
 
   constructor(
     private readonly client: BridgethingClient,
     private readonly link: ExtensionLink,
     private readonly log: (message: string) => void,
+    /** Holds the picture back by this many milliseconds, for when the sound can't catch up. */
+    private readonly delayPicture: (ms: number) => void,
   ) {
     client.player.onSnapshot((reply) => this.record(reply.state.playback, 'push'));
     window.setInterval(() => this.poll(), POLL_MS);
@@ -84,6 +98,8 @@ export class Sound {
     this.aligned = false;
     this.checkingSeek = false;
     this.soughtTo = null;
+    this.awaitingPush = false;
+    this.forwardBlocked = false;
     this.driftCount = 0;
     // The extension notes where the host player starts as it loads; forget the last load.
     await this.link.resetHostTimeline(sessionID).catch(() => {});
@@ -128,8 +144,16 @@ export class Sound {
       return;
     }
     if (this.checkingSeek) {
-      // Learn how far ahead to aim from where the seek landed, and fix a clear miss now.
       this.checkingSeek = false;
+      if (this.beforeSeek < 0 && Math.abs(difference - this.beforeSeek) < MISS_TOLERANCE_MS) {
+        // The seek forward did nothing, so the picture waits for the sound instead.
+        this.forwardBlocked = true;
+        this.log(`Sound can't go further ahead; holding the picture back ${Math.round(magnitude)} ms`);
+        this.delayPicture(magnitude);
+        this.settle();
+        return;
+      }
+      // Learn how far ahead to aim from where the seek landed, and fix a clear miss now.
       this.seekLeadMs = Math.max(0, Math.min(MAXIMUM_SEEK_LEAD_MS, Math.round(this.seekLeadMs - difference)));
       saveSeekLead(this.seekLeadMs);
       this.log(`Seek landed ${describe(difference)}; aiming ${this.seekLeadMs} ms ahead from now on`);
@@ -152,13 +176,26 @@ export class Sound {
     this.lastAlignAt = Date.now();
     this.driftCount = 0;
     if (Math.abs(difference) < 40) return;
-    // Reports until the seek lands would read as more drift.
-    this.playingSince = Date.now();
+    if (difference < 0 && this.forwardBlocked) {
+      this.log(`Holding the picture back ${Math.round(-difference)} ms (${reason})`);
+      this.delayPicture(-difference);
+      this.settle();
+      return;
+    }
+    this.settle();
     this.checkingSeek = true;
+    this.beforeSeek = difference;
     const aim = Math.max(0, Math.round(target + this.seekLeadMs));
     this.soughtTo = { positionMs: aim, at: Date.now() };
+    this.awaitingPush = true;
     this.log(`Aligning sound (${reason}, ${describe(difference)}): seek to ${aim} ms`);
     this.client.player.seekTo({ positionMs: aim }).catch(() => {});
+  }
+
+  /** Readings until a seek or picture shift lands would read as more drift. */
+  private settle(): void {
+    this.playingSince = Date.now();
+    this.lastAlignAt = Date.now();
   }
 
   private hostPosition(): number | null {
@@ -190,6 +227,8 @@ export class Sound {
     // Right after a seek, Bridgething reports the requested position before the player gets there.
     const echo = this.soughtTo && playback.positionMs === this.soughtTo.positionMs && Date.now() - this.soughtTo.at < 3_000;
     if (echo) return;
+    if (source === 'poll' && this.awaitingPush) return;
+    if (source === 'push') this.awaitingPush = false;
     // Troubleshooting: note reports that don't continue from the previous one.
     const expected = this.hostPosition();
     const reported = playback.positionMs + (playback.positionAgeMs ?? 0);

@@ -1,6 +1,6 @@
 {
   "name": "tvthing",
-  "version": "3.0.5",
+  "version": "3.0.6",
   "private": true,
   "description": "TV Thing for Bridgething: live TV on the Car Thing, with the sound on your computer.",
   "license": "MIT",

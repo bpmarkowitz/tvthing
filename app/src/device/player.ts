@@ -117,6 +117,22 @@ export class Player {
     this.video.load();
   }
 
+  /**
+   * Steps the picture back by up to a few seconds within what's already buffered, so the
+   * sound can catch up with it. Skipped if that part of the stream isn't buffered any more.
+   */
+  holdBack(ms: number): void {
+    const target = this.video.currentTime - Math.min(ms, 3_000) / 1_000;
+    const { buffered } = this.video;
+    for (let index = 0; index < buffered.length; index += 1) {
+      if (target >= buffered.start(index) && target <= buffered.end(index)) {
+        this.video.currentTime = target;
+        return;
+      }
+    }
+    this.link.log(`Couldn't hold the picture back ${Math.round(ms)} ms: not buffered`);
+  }
+
   /** Nudges a paused video, e.g. after the user touches the screen. */
   resume(): void {
     if (this.url && this.video.paused) this.video.play().catch(() => {});

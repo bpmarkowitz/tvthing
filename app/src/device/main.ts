@@ -44,7 +44,12 @@ class App {
   private readonly client: BridgethingClient = this.browser ? browserClient() : new BridgethingClient({ url: `ws://${location.host}/` });
   private readonly link = new ExtensionLink(this.browser ? new BrowserTransport() : new BridgethingTransport(this.client));
   private readonly store = new Store(this.client, (message) => this.link.log(message));
-  private readonly sound = new Sound(this.client, this.link, (message) => this.link.log(message));
+  private readonly sound = new Sound(
+    this.client,
+    this.link,
+    (message) => this.link.log(message),
+    (ms) => this.player.holdBack(ms),
+  );
   private readonly screen = new Screen();
   private readonly guide = new Guide();
   private readonly nudge = new NudgeDisplay();
