@@ -7,6 +7,8 @@ import { RelayError } from './relay';
 import { locateFFmpeg, Transcoder } from './transcoder';
 
 const IDLE_CONVERSION_MS = 45_000;
+/** Recent log lines kept for `GET /api/v1/log`, for troubleshooting. */
+const LOG_LINES = 400;
 
 export interface ServerOptions {
   version: string;
@@ -21,15 +23,24 @@ export class Engine {
   private ffmpegPath: string | null | undefined;
   private readonly port: number;
   private readonly origin: string;
+  private readonly recent: string[] = [];
 
   constructor(private readonly options: ServerOptions) {
     this.port = options.port ?? EXTENSION_PORT;
     this.origin = `http://127.0.0.1:${this.port}`;
   }
 
+  /** Logs to Bridgething and keeps the line for `GET /api/v1/log`. */
+  private readonly log = (line: string) => {
+    const time = new Date().toLocaleTimeString('en-US', { hour12: false });
+    this.recent.push(`${time} ${line}`);
+    if (this.recent.length > LOG_LINES) this.recent.shift();
+    this.options.log(line);
+  };
+
   async start() {
     await Transcoder.removeStaleOutput();
-    this.server = Deno.serve({ hostname: '127.0.0.1', port: this.port, onListen: () => this.options.log(`Listening on ${this.origin}`) }, (request) =>
+    this.server = Deno.serve({ hostname: '127.0.0.1', port: this.port, onListen: () => this.log(`Listening on ${this.origin}`) }, (request) =>
       this.respond(request)
     );
     this.housekeeping = setInterval(() => this.session?.suspendIfIdle(IDLE_CONVERSION_MS), 5_000);
@@ -78,15 +89,18 @@ export class Engine {
       const session = new StreamSession(body.source, body.playback ?? 'automatic', {
         origin: this.origin,
         ffmpeg: () => this.ffmpeg(),
-        log: this.options.log,
+        log: this.log,
       });
       this.session = session;
       const reply: SessionReply = { id: session.id, playlist: session.playlistPath };
       return json(reply);
     }
+    if (request.method === 'GET' && path === 'api/v1/log') {
+      return new Response(this.recent.join('\n') + '\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
+    }
     if (request.method === 'POST' && path === 'api/v1/log') {
       const body = (await request.json()) as LogRequest;
-      this.options.log(`Car Thing: ${String(body?.message ?? '').slice(0, 500)}`);
+      this.log(`Car Thing: ${String(body?.message ?? '').slice(0, 500)}`);
       return json({ ok: true });
     }
     if ((request.method === 'GET' || request.method === 'HEAD') && parts[0] === 'stream') {

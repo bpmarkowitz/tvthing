@@ -12,6 +12,8 @@ const JUMP_COOLDOWN_MS = 5_000;
 /** The host player reports itself playing a little before its position settles. */
 const SETTLE_MS = 1_200;
 const POLL_MS = 1_000;
+/** How often the measured difference is logged, for troubleshooting sync. */
+const REPORT_MS = 15_000;
 
 interface HostReport {
   positionMs: number;
@@ -33,6 +35,7 @@ export class Sound {
   private lastAlignAt = 0;
   private driftCount = 0;
   private offsetMs = 0;
+  private lastReportAt = 0;
 
   constructor(private readonly client: BridgethingClient, private readonly log: (message: string) => void) {
     client.player.onSnapshot((reply) => this.record(reply.state.playback));
@@ -76,6 +79,11 @@ export class Sound {
     const difference = host - target;
     const magnitude = Math.abs(difference);
     const sinceAlign = Date.now() - this.lastAlignAt;
+    if (Date.now() - this.lastReportAt >= REPORT_MS) {
+      this.lastReportAt = Date.now();
+      const age = this.host ? Date.now() - this.host.at : 0;
+      this.log(`Sync: sound ${difference >= 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms (picture ${Math.round(pictureMs)} ms, report ${age} ms old, reported age ${this.host?.ageMs ?? 0} ms)`);
+    }
     if (!this.aligned) {
       this.align(target, difference, 'start');
       return;
