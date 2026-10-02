@@ -1,8 +1,11 @@
 import type { BridgethingClient } from '@bridgething/client';
 import type { ExtensionLink } from './link';
 
-/** Moving the picture costs a small hitch, so small differences are left alone. */
-const DRIFT_THRESHOLD_MS = 200;
+/**
+ * Moving the picture costs a small hitch, and position reports carry a couple hundred
+ * milliseconds of jitter, so smaller differences are left to the viewer's nudge.
+ */
+const DRIFT_THRESHOLD_MS = 300;
 /** Consecutive out-of-sync checks before acting, so one jittery reading is ignored. */
 const DRIFT_SAMPLES = 3;
 /** Picture moves for slow drift are at most this frequent. */
@@ -13,7 +16,7 @@ const JUMP_COOLDOWN_MS = 4_000;
 /** After starting or moving the picture, readings take a moment to settle. */
 const SETTLE_MS = 2_000;
 /** After a move, a miss larger than this is corrected straight away (a few times at most). */
-const MISS_TOLERANCE_MS = 120;
+const MISS_TOLERANCE_MS = 300;
 const QUICK_RETRIES = 2;
 const POLL_MS = 1_000;
 /** How often the measured difference is logged, for troubleshooting sync. */
@@ -51,6 +54,8 @@ export class Sound {
   /** Set after moving the picture, until where it landed has been checked. */
   private checkingMove = false;
   private retries = 0;
+  /** Whether `onInSync` has run since the sound (or picture) last started. */
+  private announced = false;
 
   constructor(
     private readonly client: BridgethingClient,
@@ -58,6 +63,8 @@ export class Sound {
     private readonly log: (message: string) => void,
     /** Moves the picture by this many milliseconds (positive is later in the stream). */
     private readonly movePicture: (ms: number) => void,
+    /** The picture has first lined up with the sound (or got as close as it will). */
+    private readonly onInSync: () => void,
   ) {
     client.player.onSnapshot((reply) => this.record(reply.state.playback));
     window.setInterval(() => this.poll(), POLL_MS);
@@ -76,6 +83,7 @@ export class Sound {
     this.settledAt = null;
     this.aligned = false;
     this.checkingMove = false;
+    this.announced = false;
     this.driftCount = 0;
     // The extension notes where the host player starts as it loads; forget the last load.
     await this.link.resetHostTimeline(sessionID).catch(() => {});
@@ -95,6 +103,7 @@ export class Sound {
   realign(): void {
     this.aligned = false;
     this.checkingMove = false;
+    this.announced = false;
   }
 
   /** Positive plays the sound later than the picture. Applied at once. */
@@ -130,6 +139,8 @@ export class Sound {
       if (magnitude > MISS_TOLERANCE_MS && this.retries < QUICK_RETRIES) {
         this.retries += 1;
         this.move(difference, 'retry');
+      } else {
+        this.announce();
       }
       return;
     }
@@ -146,12 +157,21 @@ export class Sound {
   private move(difference: number, reason: string): void {
     this.aligned = true;
     this.driftCount = 0;
-    if (Math.abs(difference) < 40) return;
+    if (Math.abs(difference) < MISS_TOLERANCE_MS) {
+      this.announce();
+      return;
+    }
     this.lastMoveAt = Date.now();
     this.settledAt = Date.now();
     this.checkingMove = true;
     this.log(`Moving the picture ${difference > 0 ? 'ahead' : 'back'} ${Math.round(Math.abs(difference))} ms to match the sound (${reason})`);
     this.movePicture(difference);
+  }
+
+  private announce(): void {
+    if (this.announced) return;
+    this.announced = true;
+    this.onInSync();
   }
 
   private hostPosition(): number | null {
