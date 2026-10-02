@@ -1,6 +1,6 @@
 # Channel packs
 
-A channel pack is a JSON file (extension `.tvthing`) for sharing a lineup. Import one from **Settings → Channels → Import…**. Exports use the same format.
+A channel pack is a JSON file (extension `.tvthing`) for sharing a lineup. Import one in TV Thing's settings in Bridgething (**Import a file…**). **Export channels** writes the same format.
 
 ```json
 {

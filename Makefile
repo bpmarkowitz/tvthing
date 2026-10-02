@@ -1,39 +1,26 @@
-# Common tasks. Build output goes outside the repo (iCloud-synced folders break code signing).
-BUILD_DIR ?= $(TMPDIR)tvthing-build
-# Optional, untracked Local.mk: `TEAM = <Apple team ID>` signs builds with your team;
-# `NOTARY_PROFILE = <notarytool keychain profile>` also notarizes release downloads.
--include Local.mk
+# Common tasks. Everything lives in app/: the Car Thing app, its settings page, and the
+# Bridgething extension that runs on the computer.
 
-.PHONY: all carthing test integration app release server clean
+.PHONY: all test dev release clean
 
-all: carthing app
+## Builds and zips the app → app/dist/TVThing.zip (also typechecks and runs the tests)
+all:
+	cd app && npm install --no-audit --no-fund && npm run package
 
-## Car Thing webapp → carthing/dist/TVThing-CarThing.zip
-carthing:
-	cd carthing && npm install --no-audit --no-fund && npm run package
-
-## Unit tests for the Mac engine
+## Tests (needs Deno)
 test:
-	cd mac/TVThingKit && swift test --scratch-path $(BUILD_DIR)/kit
+	cd app && npm test
 
-## Live end-to-end tests (network + FFmpeg)
-integration:
-	cd mac/TVThingKit && TVTHING_INTEGRATION=1 swift test --scratch-path $(BUILD_DIR)/kit --filter EngineIntegrationTests
+## Develop without a Car Thing: the extension on its own, plus a browser stand-in for Bridgething.
+## Open http://localhost:5173/?browser (the Car Thing app) or /settings-dev (settings).
+dev: all
+	cd app && (deno run -A dist/extension-dev.mjs & npm run dev)
 
-## The Mac app (embeds the Car Thing webapp if it has been built)
-app:
-	xcodebuild -project mac/TVThing.xcodeproj -scheme TVThing -configuration Release -derivedDataPath $(BUILD_DIR)/xcode $(if $(TEAM),DEVELOPMENT_TEAM=$(TEAM)) build
-	@echo "Built $(BUILD_DIR)/xcode/Build/Products/Release/TV Thing.app"
-
-## Downloads for a GitHub release, in dist/
-VERSION := $(shell node -p "require('./carthing/package.json').version")
-release: carthing
-	BUILD_DIR="$(BUILD_DIR)" TEAM="$(TEAM)" NOTARY_PROFILE="$(NOTARY_PROFILE)" mac/Scripts/release.sh
+## The download for a GitHub release, in dist/
+VERSION := $(shell node -p "require('./app/package.json').version")
+release: all
+	mkdir -p dist && cp app/dist/TVThing.zip dist/TVThing-$(VERSION).zip
 	@echo "Release $(VERSION) is in dist/"
 
-## Headless engine for Car Thing development: make server PACK=examples/channel-packs/starter-channels.tvthing
-server:
-	cd mac/TVThingKit && swift run --scratch-path $(BUILD_DIR)/kit tvthing-server $(if $(PACK),--pack $(abspath $(PACK)))
-
 clean:
-	rm -rf $(BUILD_DIR) carthing/dist
+	rm -rf app/dist dist

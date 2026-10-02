@@ -2,53 +2,60 @@
 
 A provider teaches TV Thing about a new kind of source, such as a streaming service with its own URLs or tokens. Nothing outside the provider needs to know how it works.
 
-## 1. Implement `StreamProvider`
+## 1. Write the provider
 
-```swift
-public struct ExampleProvider: StreamProvider {
-    public let id: ProviderID = "example"
-    public let displayName = "Example TV"
+Providers live in the extension, in `app/extension/engine/`:
 
-    /// Offline check: does this input look like ours? Used to route what the user typed.
-    public func accepts(_ input: String) -> Bool {
-        URL(string: input)?.host == "watch.example.com"
-    }
+```ts
+import type { SourceReference } from '../../src/shared/library';
+import type { Provider } from './providers';
+import type { Upstream } from './relay';
 
-    /// Validate input (network allowed) and return a stable reference plus a suggested name.
-    public func candidate(for input: String) async throws -> SourceCandidate {
-        let channelID = …
-        return SourceCandidate(reference: .init(provider: id, value: channelID), suggestedName: "…")
-    }
+export const exampleProvider: Provider = {
+  id: 'example',
 
-    /// Produce a playable HLS playlist. `refresh` is true after upstream rejected a
-    /// request (401/403), so drop any cached session or token.
-    public func resolve(_ reference: SourceReference, refresh: Bool) async throws -> ResolvedStream {
-        let token = try await session(refresh: refresh)
-        return ResolvedStream(playlistURL: …) { request in
-            // Runs for every playlist, key, and segment request made for this stream.
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
-    }
-
-    public func summary(of reference: SourceReference) -> String { "Example TV · \(reference.value)" }
-}
+  /**
+   * Produce a playable HLS playlist. `refresh` is true after upstream rejected a request
+   * (401/403), so drop any cached session or token.
+   */
+  async resolve(reference: SourceReference, refresh: boolean): Promise<Upstream> {
+    const token = await session(refresh);
+    return {
+      entryURL: new URL(`https://watch.example.com/live/${reference.value}/master.m3u8`),
+      // Runs for every playlist, key, and segment request made for this stream.
+      prepare(url) {
+        const prepared = new URL(url);
+        prepared.searchParams.set('token', token);
+        return prepared;
+      },
+    };
+  },
+};
 ```
 
 Guidelines:
 - Store only what's needed to resolve later in `reference.value`: an ID, not a signed URL that expires.
-- Make `accepts` specific. The generic `HLSProvider` catches any leftover URL, so it must stay last.
-- If the provider keeps state (sessions, tokens), make it an `actor`, with the protocol's synchronous members marked `nonisolated`.
+- Keep session state (tokens and so on) in the provider's module, and refresh it when `refresh` is true.
+- The extension's permissions already allow network access to any host.
 
 ## 2. Register it
 
-Add it to `ProviderRegistry.standard` in `StreamProvider.swift`, before `HLSProvider`:
+Add it to `providers` in `providers.ts`:
 
-```swift
-ProviderRegistry(providers: [ExampleProvider(), HLSProvider(http: http)])
+```ts
+export const providers: Provider[] = [exampleProvider, hlsProvider];
 ```
 
-## 3. Test it
+## 3. Add channels that use it
 
-Add routing and parsing tests next to `ProviderTests` in `StreamingTests.swift`. For a live check, add a case to `EngineIntegrationTests` and run `make integration`.
+Channels name their provider in their source, so a [channel pack](channel-packs.md) can add them:
 
-That's all. Compatibility probing, conversion, relaying, audio sync, channel packs, and the Car Thing UI work automatically for the new source.
+```json
+{ "name": "Example Live", "source": { "provider": "example", "value": "channel-123" } }
+```
+
+## 4. Test it
+
+Add tests in `app/tests/` and run `make test`. For a live check, run `make dev` and tune the channel in the browser.
+
+That's all. Compatibility probing, conversion, relaying, sync, and the Car Thing UI work automatically for the new source.

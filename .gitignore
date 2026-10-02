@@ -1,12 +1,5 @@
 .DS_Store
 
-# Swift / Xcode
-.build/
-.swiftpm/
-DerivedData/
-xcuserdata/
-*.xcuserstate
-
 # Bridgething app
 app/node_modules/
 app/dist/
@@ -14,5 +7,5 @@ app/dist/
 # Release downloads
 /dist/
 
-# Local build settings (e.g. your signing team)
+# Local settings
 Local.mk
