@@ -1,0 +1,32 @@
+<!doctype html>
+<!-- Development only: hosts settings.html the way Bridgething does, with docs in
+     localStorage (shared with the ?browser app) and fetches performed by the dev server. -->
+<html><head><meta charset="utf-8"><title>TV Thing settings (dev)</title>
+<style>html,body{margin:0;height:100%}iframe{border:0;width:100%;height:100%}</style></head>
+<body><iframe id="page" src="/settings.html"></iframe>
+<script>
+const frame = document.getElementById('page');
+const handlers = {
+  context: () => ({ webappId: 'dev', name: 'TV Thing', version: 'dev', deviceId: 'dev' }),
+  'doc.get': ({ key }) => ({ key, value: localStorage.getItem('doc:' + key) }),
+  'doc.set': ({ key, value }) => (localStorage.setItem('doc:' + key, value), { key, value }),
+  'doc.delete': ({ key }) => (localStorage.removeItem('doc:' + key), { key, value: null }),
+  'doc.list': () => Object.keys(localStorage).filter((k) => k.startsWith('doc:')).map((k) => ({ key: k.slice(4), value: localStorage.getItem(k) })),
+  fetch: async (request) => {
+    const response = await fetch('/fetch', { method: 'POST', body: JSON.stringify(request) });
+    if (!response.ok) throw new Error(await response.text());
+    return response.json();
+  },
+  done: () => console.log('settings done'),
+};
+window.addEventListener('message', async (event) => {
+  if (event.source !== frame.contentWindow) return;
+  const { id, verb, payload } = JSON.parse(event.data);
+  try {
+    const value = await handlers[verb](payload ?? {});
+    frame.contentWindow.postMessage(JSON.stringify({ id, ok: true, value }), '*');
+  } catch (error) {
+    frame.contentWindow.postMessage(JSON.stringify({ id, ok: false, error: error.message }), '*');
+  }
+});
+</script></body></html>

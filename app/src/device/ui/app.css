@@ -274,6 +274,34 @@ video.locking { animation: lock-in 0.45s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
 .volume b { min-width: 50px; color: #7dff9a; font-size: 20px; text-align: right; font-variant-numeric: tabular-nums; }
 .volume.muted i.on { background: rgba(125, 255, 154, 0.3); box-shadow: none; }
 
+/* Sound timing (nudge mode) */
+.nudge {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 5;
+  display: grid;
+  grid-template-columns: auto minmax(240px, 1fr) auto;
+  align-items: center;
+  gap: 8px 16px;
+  width: 620px;
+  padding: 14px 20px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  pointer-events: none;
+}
+.nudge.show { opacity: 1; transform: translate(-50%, 0); }
+.nudge span { color: #ffd166; font-size: 15px; letter-spacing: 0.14em; }
+.nudge div { position: relative; height: 26px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); }
+.nudge div::before { content: ''; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 2px; margin-left: -1px; background: rgba(255, 255, 255, 0.35); }
+.nudge i { position: absolute; top: 0; bottom: 0; width: 10px; margin-left: -5px; border-radius: 3px; background: #ffd166; box-shadow: 0 0 8px rgba(255, 209, 102, 0.6); transition: left 0.1s ease; }
+.nudge b { min-width: 130px; color: #ffd166; font-size: 20px; text-align: right; font-variant-numeric: tabular-nums; }
+.nudge small { grid-column: 1 / -1; color: var(--muted); font-size: 14px; font-weight: 600; text-align: center; }
+
 /* Mute badge */
 .muted {
   position: absolute;

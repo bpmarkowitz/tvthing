@@ -1,7 +1,7 @@
 import type { HlsConfig, Loader, LoaderCallbacks, LoaderConfiguration, LoaderContext, LoaderStats } from 'hls.js';
-import type { MacLink } from './mac';
+import type { ExtensionLink } from './link';
 
-/** Playlists can take a while when the Mac is starting FFmpeg for a stream. */
+/** Playlists can take a while when the computer is starting FFmpeg for a stream. */
 const PLAYLIST_TIMEOUT_MS = 25_000;
 const SEGMENT_TIMEOUT_MS = 15_000;
 
@@ -12,9 +12,9 @@ function emptyStats(): LoaderStats {
 
 /**
  * An hls.js loader that fetches through Bridgething's network bridge instead of XHR,
- * since the Car Thing can't reach the Mac's local server directly.
+ * since the Car Thing can't reach the computer's local server directly.
  */
-export function makeLoader(link: MacLink): HlsConfig['loader'] {
+export function makeLoader(link: ExtensionLink): HlsConfig['loader'] {
   return class BridgeLoader implements Loader<LoaderContext> {
     context: LoaderContext | null = null;
     stats: LoaderStats = emptyStats();

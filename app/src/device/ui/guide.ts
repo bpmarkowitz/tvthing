@@ -1,4 +1,4 @@
-import type { ChannelInfo } from '../mac';
+import type { ChannelInfo } from '../store';
 
 const VISIBLE_ROWS = 7;
 const AUTO_CLOSE_MS = 6_000;
@@ -13,6 +13,7 @@ export class Guide {
   private channels: ChannelInfo[] = [];
   private index = 0;
   private closeTimer: number | undefined;
+  private onAutoClose: (() => void) | undefined;
 
   get isOpen(): boolean {
     return this.root.classList.contains('show');
@@ -22,8 +23,10 @@ export class Guide {
     return this.channels[this.index];
   }
 
-  open(channels: ChannelInfo[], currentID: string | undefined): void {
+  /** `onAutoClose` runs if the guide closes itself after sitting idle. */
+  open(channels: ChannelInfo[], currentID: string | undefined, onAutoClose?: () => void): void {
     if (channels.length === 0) return;
+    this.onAutoClose = onAutoClose;
     this.channels = channels;
     this.index = Math.max(0, channels.findIndex((channel) => channel.id === currentID));
     this.root.classList.add('show');
@@ -43,7 +46,7 @@ export class Guide {
     const highlightedID = this.highlighted?.id;
     this.channels = channels;
     this.index = Math.max(0, channels.findIndex((channel) => channel.id === highlightedID));
-    if (channels.length === 0) this.close();
+    if (channels.length === 0) this.autoClose();
     else this.render();
   }
 
@@ -52,9 +55,14 @@ export class Guide {
     this.root.classList.remove('show');
   }
 
+  private autoClose(): void {
+    this.close();
+    this.onAutoClose?.();
+  }
+
   private render(): void {
     window.clearTimeout(this.closeTimer);
-    this.closeTimer = window.setTimeout(() => this.close(), AUTO_CLOSE_MS);
+    this.closeTimer = window.setTimeout(() => this.autoClose(), AUTO_CLOSE_MS);
 
     const count = this.channels.length;
     const rows = Math.min(VISIBLE_ROWS, count);

@@ -7,9 +7,9 @@ DerivedData/
 xcuserdata/
 *.xcuserstate
 
-# Car Thing webapp
-carthing/node_modules/
-carthing/dist/
+# Bridgething app
+app/node_modules/
+app/dist/
 
 # Release downloads
 /dist/

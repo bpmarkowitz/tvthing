@@ -1,4 +1,5 @@
-import type { ChannelInfo, DisplayOptions } from '../mac';
+import type { Prefs } from '../../shared/library';
+import type { ChannelInfo } from '../store';
 import { FramingControl } from './framing';
 import { TuningEffect } from './tuning';
 
@@ -75,12 +76,12 @@ export class Screen {
     }, RECOVERY_REVEAL_MS);
   }
 
-  /** Persistent picture styling chosen on the Mac. */
-  setDisplay(options: DisplayOptions): void {
+  /** Picture styling from Settings. */
+  setDisplay(options: Pick<Prefs, 'scanlines'>): void {
     document.body.classList.toggle('crt', options.scanlines);
   }
 
-  /** A small speaker-off badge while the Mac's audio is muted. */
+  /** A small speaker-off badge while the sound is muted. */
   setMuted(muted: boolean): void {
     this.mutedBadge.classList.toggle('show', muted);
   }

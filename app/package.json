@@ -1,15 +1,15 @@
 {
-  "name": "tvthing-carthing",
-  "version": "2.2.5",
+  "name": "tvthing",
+  "version": "3.0.0",
   "private": true,
-  "description": "TV Thing's Car Thing webapp: a full-screen video player driven by the TV Thing Mac app.",
+  "description": "TV Thing for Bridgething: live TV on the Car Thing, with the sound on your computer.",
   "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "node scripts/build.mjs",
     "watch": "node scripts/build.mjs --watch",
     "dev": "node scripts/build.mjs && node scripts/dev-server.mjs",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && deno check --unstable-sloppy-imports extension/main.ts",
     "package": "npm run typecheck && node scripts/build.mjs --package"
   },
   "dependencies": {
@@ -17,6 +17,7 @@
     "hls.js": "^1.7.3"
   },
   "devDependencies": {
+    "@bridgething/extension": "^0.12.1",
     "esbuild": "^0.28.2",
     "typescript": "^6.0.3"
   }

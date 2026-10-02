@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>TV Thing Settings</title>
+  <style>/*STYLE*/</style>
+</head>
+<body>
+  <main>
+    <header class="top">
+      <div>
+        <h1>TV Thing</h1>
+        <p id="status" class="status">Checking the TV Thing helper…</p>
+      </div>
+      <button id="done" class="quiet">Done</button>
+    </header>
+
+    <section>
+      <div class="section-head">
+        <h2>Channels</h2>
+        <span id="count" class="muted"></span>
+      </div>
+      <ol id="channels" class="channels"></ol>
+      <p id="empty" class="empty" hidden>No channels yet. Add one below, or start with the free channels.</p>
+    </section>
+
+    <section>
+      <h2>Add a channel</h2>
+      <form id="add" class="card stack">
+        <label>Stream or playlist URL<input id="add-url" type="url" placeholder="https://example.com/live/index.m3u8" required autocomplete="off" spellcheck="false"></label>
+        <label><span>Name <span class="muted">(optional)</span></span><input id="add-name" type="text" placeholder="Taken from the playlist if left blank" autocomplete="off"></label>
+        <div class="row">
+          <button type="submit" class="primary" id="add-button">Add</button>
+          <span id="add-message" class="message"></span>
+        </div>
+        <p class="hint">An HLS stream (.m3u8) adds one channel. An M3U playlist adds every channel in it.</p>
+      </form>
+    </section>
+
+    <section>
+      <h2>Import</h2>
+      <div class="card stack">
+        <div class="row wrap">
+          <label class="button">Import a file…<input id="import-file" type="file" accept=".tvthing,.m3u,.m3u8,.json,text/plain,application/json" hidden></label>
+          <button id="starter">Add the free channels</button>
+          <button id="export">Export channels</button>
+        </div>
+        <p id="import-message" class="message"></p>
+        <p class="hint">Files can be TV Thing channel packs (.tvthing) or M3U playlists. Channels already in your lineup are skipped.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Picture and sound</h2>
+      <div class="card">
+        <label class="toggle"><span><strong>CRT scanlines</strong><small>Faint lines over the picture, like an old TV.</small></span><input id="scanlines" type="checkbox"></label>
+        <div class="setting">
+          <span><strong>Sound timing</strong><small>Shift the sound if it doesn't match the picture. You can also do this on the Car Thing: press the knob twice, then turn.</small></span>
+          <div class="stepper">
+            <button id="offset-down" aria-label="Earlier">−</button>
+            <output id="offset">In sync</output>
+            <button id="offset-up" aria-label="Later">+</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>On the Car Thing</h2>
+      <div class="card help">
+        <p><b>Knob</b> Turn for volume. Press for the channel guide, where turning browses and pressing tunes. Press on the channel that's already playing to adjust sound timing.</p>
+        <p><b>1–4</b> Favorite channels. In the guide, press a button to save the highlighted channel to it.</p>
+        <p><b>Front button</b> Mute, or back out of the guide.</p>
+        <p><b>Screen</b> Tap to switch between Fill, Fit and Zoom.</p>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="editor">
+    <form method="dialog" class="stack" id="edit-form">
+      <h2>Edit channel</h2>
+      <label>Name<input id="edit-name" type="text" required></label>
+      <label id="edit-url-label">Stream URL<input id="edit-url" type="url" required spellcheck="false"></label>
+      <label>Playback
+        <select id="edit-playback">
+          <option value="automatic">Automatic</option>
+          <option value="direct">Always direct</option>
+          <option value="convert">Always convert (needs FFmpeg)</option>
+        </select>
+      </label>
+      <p class="hint">Automatic sends streams straight to the Car Thing when it can play them, and converts the rest with FFmpeg.</p>
+      <div class="row end">
+        <button value="cancel" formnovalidate>Cancel</button>
+        <button value="save" class="primary">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>/*SCRIPT*/</script>
+</body>
+</html>

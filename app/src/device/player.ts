@@ -1,7 +1,7 @@
 import Hls, { ErrorTypes, Events } from 'hls.js';
 import { bufferedAhead } from './buffer';
 import { makeLoader } from './loader';
-import type { MacLink } from './mac';
+import { errorMessage, type ExtensionLink } from './link';
 
 /** How long each kind of trouble is given to clear up before the stream is reloaded. */
 const RECOVERY_DELAY_MS = {
@@ -31,7 +31,7 @@ const SPLICE_WATCH = { durationMs: 3_000, intervalMs: 100, stoppedMs: 350, minBu
  * resetting the decoder) while it's wedged crashes the Car Thing's browser, but a full
  * reload is safe, so the player reloads right away and lets the app cover the gap. Just
  * after each splice it watches frames closely, catching that in ~0.35 s rather than the
- * ~1 s hls.js takes to report a stall — before the Mac's audio has drifted audibly.
+ * ~1 s hls.js takes to report a stall — before the computer's audio has drifted audibly.
  */
 export class Player {
   private hls: Hls | null = null;
@@ -46,10 +46,12 @@ export class Player {
 
   constructor(
     private readonly video: HTMLVideoElement,
-    private readonly link: MacLink,
+    private readonly link: ExtensionLink,
     private readonly onStarted: () => void,
     /** The stream is about to reload mid-show; a chance to cover the gap. */
     private readonly onReloading: () => void,
+    /** The stream couldn't load; the message explains why when TV Thing knows. */
+    private readonly onFailed: (message: string) => void,
   ) {
     video.addEventListener('playing', () => {
       this.playing = true;
@@ -68,10 +70,12 @@ export class Player {
     window.setInterval(() => this.checkForFrozenVideo(), 1_000);
   }
 
-  /** Program-date-time of the frame on screen, in Unix milliseconds. */
-  get position(): number | null {
-    const time = this.hls?.playingDate?.getTime();
-    return time !== undefined && Number.isFinite(time) ? time : null;
+  /**
+   * Where the picture is, in milliseconds on the stream's timeline. Bridgething's host player
+   * measures the same playlist the same way, so the two are directly comparable.
+   */
+  get positionMs(): number {
+    return this.video.currentTime * 1_000;
   }
 
   /** Increments on every (re)start of the stream. */
@@ -169,6 +173,9 @@ export class Player {
         this.scheduleRecovery('media error', RECOVERY_DELAY_MS.media);
       } else {
         this.link.log(`Stream error: ${data.details}`);
+        const response = (data as { response?: { text?: unknown } }).response;
+        const explained = typeof response?.text === 'string' ? errorMessage(response.text) : undefined;
+        if (explained) this.onFailed(explained);
         this.scheduleRecovery(data.details, RECOVERY_DELAY_MS.network);
       }
     });
