@@ -10,7 +10,17 @@ const DRIFT_COOLDOWN_MS = 20_000;
 const JUMP_THRESHOLD_MS = 2_000;
 const JUMP_COOLDOWN_MS = 5_000;
 /** The host player reports itself playing a little before its position settles. */
-const SETTLE_MS = 1_200;
+const SETTLE_MS = 2_000;
+/**
+ * A seek takes a moment to land, and the sound resumes from the requested point only then,
+ * so seeks aim ahead by this much. It's learned from where each seek lands (and remembered).
+ */
+const INITIAL_SEEK_LEAD_MS = 500;
+const MAXIMUM_SEEK_LEAD_MS = 3_000;
+const SEEK_LEAD_KEY = 'sound:seekLeadMs';
+/** After a seek, a miss larger than this is corrected straight away (a few times at most). */
+const MISS_TOLERANCE_MS = 100;
+const QUICK_RETRIES = 2;
 const POLL_MS = 1_000;
 /** How often the measured difference is logged, for troubleshooting sync. */
 const REPORT_MS = 15_000;
@@ -36,6 +46,10 @@ export class Sound {
   private driftCount = 0;
   private offsetMs = 0;
   private lastReportAt = 0;
+  private seekLeadMs = loadSeekLead();
+  /** Set after a seek, until where it landed has been checked. */
+  private checkingSeek = false;
+  private retries = 0;
 
   constructor(private readonly client: BridgethingClient, private readonly log: (message: string) => void) {
     client.player.onSnapshot((reply) => this.record(reply.state.playback, 'push'));
@@ -52,6 +66,7 @@ export class Sound {
     this.host = null;
     this.playingSince = null;
     this.aligned = false;
+    this.checkingSeek = false;
     this.driftCount = 0;
     this.client.player.play({ uri: url, context: null }).catch((error: Error) => this.log(`Host player wouldn't play: ${error.message}`));
   }
@@ -85,12 +100,28 @@ export class Sound {
       this.log(`Sync: sound ${difference >= 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms (picture ${Math.round(pictureMs)} ms, report ${age} ms old, reported age ${this.host?.ageMs ?? 0} ms)`);
     }
     if (!this.aligned) {
+      this.retries = 0;
       this.align(target, difference, 'start');
+      return;
+    }
+    if (this.checkingSeek) {
+      // Learn how far ahead to aim from where the seek landed, and fix a clear miss now.
+      this.checkingSeek = false;
+      this.seekLeadMs = Math.max(0, Math.min(MAXIMUM_SEEK_LEAD_MS, Math.round(this.seekLeadMs - difference)));
+      saveSeekLead(this.seekLeadMs);
+      this.log(`Seek landed ${Math.round(Math.abs(difference))} ms ${difference >= 0 ? 'ahead' : 'behind'}; aiming ${this.seekLeadMs} ms ahead from now on`);
+      if (magnitude > MISS_TOLERANCE_MS && this.retries < QUICK_RETRIES) {
+        this.retries += 1;
+        this.align(target, difference, 'retry');
+      }
       return;
     }
     this.driftCount = magnitude > DRIFT_THRESHOLD_MS ? this.driftCount + 1 : 0;
     if (this.driftCount < DRIFT_SAMPLES) return;
-    if (magnitude > JUMP_THRESHOLD_MS ? sinceAlign >= JUMP_COOLDOWN_MS : sinceAlign >= DRIFT_COOLDOWN_MS) this.align(target, difference, 'drift');
+    if (magnitude > JUMP_THRESHOLD_MS ? sinceAlign >= JUMP_COOLDOWN_MS : sinceAlign >= DRIFT_COOLDOWN_MS) {
+      this.retries = 0;
+      this.align(target, difference, 'drift');
+    }
   }
 
   private align(target: number, difference: number, reason: string): void {
@@ -100,8 +131,10 @@ export class Sound {
     // The seek takes a moment to land; reports until then would read as more drift.
     this.playingSince = Date.now();
     if (Math.abs(difference) < 40) return;
-    this.log(`Aligned sound (${reason}, was ${difference > 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms): seek to ${Math.round(target)} ms`);
-    this.client.player.seekTo({ positionMs: Math.max(0, Math.round(target)) }).catch(() => {});
+    this.checkingSeek = true;
+    const aim = target + this.seekLeadMs;
+    this.log(`Aligned sound (${reason}, was ${difference > 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms): seek to ${Math.round(aim)} ms`);
+    this.client.player.seekTo({ positionMs: Math.max(0, Math.round(aim)) }).catch(() => {});
   }
 
   private hostPosition(): number | null {
@@ -132,5 +165,22 @@ export class Sound {
     if (playing && this.playingSince === null) this.playingSince = Date.now();
     if (!playing) this.playingSince = null;
     this.host = { positionMs: playback.positionMs, ageMs: playback.positionAgeMs ?? 0, playing, at: Date.now() };
+  }
+}
+
+function loadSeekLead(): number {
+  try {
+    const stored = Number(localStorage.getItem(SEEK_LEAD_KEY));
+    return Number.isFinite(stored) && stored > 0 ? Math.min(stored, MAXIMUM_SEEK_LEAD_MS) : INITIAL_SEEK_LEAD_MS;
+  } catch {
+    return INITIAL_SEEK_LEAD_MS;
+  }
+}
+
+function saveSeekLead(ms: number): void {
+  try {
+    localStorage.setItem(SEEK_LEAD_KEY, String(ms));
+  } catch {
+    // Not remembered; it's learned again next time.
   }
 }
