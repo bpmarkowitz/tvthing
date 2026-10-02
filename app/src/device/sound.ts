@@ -38,7 +38,7 @@ export class Sound {
   private lastReportAt = 0;
 
   constructor(private readonly client: BridgethingClient, private readonly log: (message: string) => void) {
-    client.player.onSnapshot((reply) => this.record(reply.state.playback));
+    client.player.onSnapshot((reply) => this.record(reply.state.playback, 'push'));
     window.setInterval(() => this.poll(), POLL_MS);
   }
 
@@ -100,7 +100,7 @@ export class Sound {
     // The seek takes a moment to land; reports until then would read as more drift.
     this.playingSince = Date.now();
     if (Math.abs(difference) < 40) return;
-    this.log(`Aligned sound (${reason}, was ${difference > 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms)`);
+    this.log(`Aligned sound (${reason}, was ${difference > 0 ? 'ahead' : 'behind'} by ${Math.round(Math.abs(difference))} ms): seek to ${Math.round(target)} ms`);
     this.client.player.seekTo({ positionMs: Math.max(0, Math.round(target)) }).catch(() => {});
   }
 
@@ -114,15 +114,21 @@ export class Sound {
     if (!this.url) return;
     try {
       const reply = await this.client.player.stateGet({ timeoutMs: 2_000 });
-      if (reply.ok) this.record(reply.response.state.playback);
+      if (reply.ok) this.record(reply.response.state.playback, 'poll');
     } catch {
       // Keep the last report.
     }
   }
 
-  private record(playback: { state: string; positionMs: number; positionAgeMs: number | null }): void {
+  private record(playback: { state: string; positionMs: number; positionAgeMs: number | null }, source: string): void {
     if (!this.url) return;
     const playing = playback.state === 'playing';
+    // Troubleshooting: note reports that don't continue from the previous one.
+    const expected = this.hostPosition();
+    const reported = playback.positionMs + (playback.positionAgeMs ?? 0);
+    if (expected === null || !playing || Math.abs(reported - expected) > 300) {
+      this.log(`Host ${source}: ${playback.state} at ${playback.positionMs} ms, age ${playback.positionAgeMs ?? 'none'}${expected === null ? '' : `, expected ${Math.round(expected)}`}`);
+    }
     if (playing && this.playingSince === null) this.playingSince = Date.now();
     if (!playing) this.playingSince = null;
     this.host = { positionMs: playback.positionMs, ageMs: playback.positionAgeMs ?? 0, playing, at: Date.now() };

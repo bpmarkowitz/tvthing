@@ -60,6 +60,14 @@ export class Player {
       this.onStarted();
     });
     video.addEventListener('waiting', () => (this.playing = false));
+    // Troubleshooting sync: hls.js sometimes jumps to catch up with the live edge.
+    let seekFrom = 0;
+    video.addEventListener('timeupdate', () => {
+      if (!video.seeking) seekFrom = video.currentTime;
+    });
+    video.addEventListener('seeked', () => {
+      if (Math.abs(video.currentTime - seekFrom) > 1) this.link.log(`Picture jumped from ${Math.round(seekFrom * 1000)} to ${Math.round(video.currentTime * 1000)} ms`);
+    });
     video.addEventListener('pause', () => {
       this.playing = false;
       if (!this.url) return;
