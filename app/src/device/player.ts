@@ -86,6 +86,12 @@ export class Player {
     return this.video.currentTime * 1_000;
   }
 
+  /** Program-date-time of the frame on screen, in Unix milliseconds, when the stream has it. */
+  get programDate(): number | null {
+    const time = this.hls?.playingDate?.getTime();
+    return time !== undefined && Number.isFinite(time) ? time : null;
+  }
+
   /** Increments on every (re)start of the stream. */
   get generation(): number {
     return this.startCount;

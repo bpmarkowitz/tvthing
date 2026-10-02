@@ -40,6 +40,13 @@ export class StreamSession {
   private output: { playlist: string; relay: Relay } | null = null;
   private lastAccess = Date.now();
   private stopped = false;
+  /**
+   * Program-date-time where the host player's position counts from: the first segment of the
+   * first media playlist it loaded. Its position is relative to that, while the Car Thing's
+   * player counts from whatever it loaded first, so comparing the two needs this anchor.
+   */
+  hostOrigin: number | null = null;
+  private seenAgents = new Set<string>();
 
   constructor(
     readonly source: SourceReference,
@@ -88,6 +95,25 @@ export class StreamSession {
       return this.output.relay.media(second, range);
     }
     throw new RelayError(404, 'Not found');
+  }
+
+  /** Notes which player loaded what, to anchor the host player's timeline. */
+  noteServed(userAgent: string, route: string[], body: Uint8Array) {
+    const agent = userAgent || 'unknown';
+    if (!this.seenAgents.has(agent)) {
+      this.seenAgents.add(agent);
+      this.environment.log(`Player connected: ${agent}`);
+    }
+    if (this.hostOrigin !== null || !isHostPlayer(agent) || !route[route.length - 1]?.endsWith('.m3u8')) return;
+    const origin = playlistOrigin(new TextDecoder().decode(body));
+    if (origin === null) return;
+    this.hostOrigin = origin;
+    this.environment.log(`Host player starts at ${new Date(origin).toISOString()}`);
+  }
+
+  /** The host player is loading the stream again from scratch. */
+  resetHost() {
+    this.hostOrigin = null;
   }
 
   // Preparation
@@ -184,6 +210,29 @@ export class StreamSession {
     if (!this.sourceRelay) throw new RelayError(503, "Stream isn't ready yet");
     return this.sourceRelay;
   }
+}
+
+/** Apple's media stack (AVPlayer) names itself this way; the Car Thing's requests don't. */
+function isHostPlayer(userAgent: string): boolean {
+  return /AppleCoreMedia|AVFoundation/i.test(userAgent);
+}
+
+/** The program-date-time of a media playlist's first segment, worked back from the first stamp. */
+export function playlistOrigin(text: string): number | null {
+  let before = 0;
+  let pendingDuration = 0;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (line.startsWith('#EXTINF:')) pendingDuration = parseFloat(line.slice(8)) * 1_000;
+    else if (line.startsWith('#EXT-X-PROGRAM-DATE-TIME:')) {
+      const stamp = Date.parse(line.slice('#EXT-X-PROGRAM-DATE-TIME:'.length));
+      return Number.isFinite(stamp) ? stamp - before : null;
+    } else if (line && !line.startsWith('#')) {
+      before += pendingDuration;
+      pendingDuration = 0;
+    }
+  }
+  return null;
 }
 
 /** Relay URIs end in their token: `/stream/<session>/s/<token>`. */

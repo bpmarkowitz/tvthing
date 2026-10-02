@@ -30,3 +30,9 @@ export interface Health {
 export interface LogRequest {
   message: string;
 }
+
+/** `GET /api/v1/sessions/<id>/host` (`DELETE` forgets it, before the host player reloads). */
+export interface HostTimeline {
+  /** Program-date-time (Unix ms) where the host player's position counts from, once known. */
+  origin: number | null;
+}

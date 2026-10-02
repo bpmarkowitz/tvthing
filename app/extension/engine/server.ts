@@ -1,7 +1,7 @@
 // TV Thing's local server, on the computer's loopback. The Car Thing reaches it through
 // Bridgething's net.fetch; Bridgething's host player and FFmpeg load stream URLs from it.
 
-import { API_VERSION, EXTENSION_PORT, type Health, type LogRequest, type SessionReply, type SessionRequest } from '../../src/shared/api';
+import { API_VERSION, EXTENSION_PORT, type Health, type LogRequest, type HostTimeline, type SessionReply, type SessionRequest } from '../../src/shared/api';
 import { message, StreamSession } from './session';
 import { RelayError } from './relay';
 import { locateFFmpeg, Transcoder } from './transcoder';
@@ -95,6 +95,13 @@ export class Engine {
       const reply: SessionReply = { id: session.id, playlist: session.playlistPath };
       return json(reply);
     }
+    if (parts[0] === 'api' && parts[1] === 'v1' && parts[2] === 'sessions' && parts.length === 5 && parts[4] === 'host') {
+      const session = this.session;
+      if (!session || session.id !== parts[3]) return error('This stream has ended', 404);
+      if (request.method === 'DELETE') session.resetHost();
+      const reply: HostTimeline = { origin: session.hostOrigin };
+      return json(reply);
+    }
     if (request.method === 'GET' && path === 'api/v1/log') {
       return new Response(this.recent.join('\n') + '\n', { headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' } });
     }
@@ -107,6 +114,7 @@ export class Engine {
       const session = this.session;
       if (!session || parts[1] !== session.id || parts.length < 3) return error('This stream has ended', 404);
       const result = await session.handle(parts.slice(2), request.headers.get('range') ?? undefined);
+      session.noteServed(request.headers.get('user-agent') ?? '', parts.slice(2), result.body);
       return new Response(request.method === 'HEAD' ? null : (result.body as Uint8Array<ArrayBuffer>), {
         status: result.status,
         headers: result.headers,

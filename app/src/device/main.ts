@@ -44,7 +44,7 @@ class App {
   private readonly client: BridgethingClient = this.browser ? browserClient() : new BridgethingClient({ url: `ws://${location.host}/` });
   private readonly link = new ExtensionLink(this.browser ? new BrowserTransport() : new BridgethingTransport(this.client));
   private readonly store = new Store(this.client, (message) => this.link.log(message));
-  private readonly sound = new Sound(this.client, (message) => this.link.log(message));
+  private readonly sound = new Sound(this.client, this.link, (message) => this.link.log(message));
   private readonly screen = new Screen();
   private readonly guide = new Guide();
   private readonly nudge = new NudgeDisplay();
@@ -62,7 +62,7 @@ class App {
     (message) => this.screen.showCard(this.store.current?.name ?? 'Can’t play this channel', message),
   );
   private mode: KnobMode = 'volume';
-  private tuned: { channel: Channel; playlist: string } | null = null;
+  private tuned: { channel: Channel; playlist: string; session: string } | null = null;
   private tuneGeneration = 0;
   private volume: { level: number; muted: boolean } | null = null;
   private nudgeTimer: number | undefined;
@@ -100,7 +100,7 @@ class App {
     this.store.onChange(() => this.libraryChanged());
     this.screen.setDisplay(this.store.prefs);
     this.sound.setOffset(this.store.prefs.audioOffsetMs);
-    window.setInterval(() => this.sound.follow(this.player.positionMs, this.player.isPlaying && this.screen.pictureVisible), SYNC_INTERVAL_MS);
+    window.setInterval(() => this.sound.follow(this.player.programDate, this.player.isPlaying && this.screen.pictureVisible), SYNC_INTERVAL_MS);
     await this.waitForExtension();
     this.link.log(`TV Thing ${__APP_VERSION__} started`);
     this.tuneCurrent();
@@ -146,7 +146,7 @@ class App {
     try {
       const session = await this.link.createSession({ source: channel.source, playback: channel.playback });
       if (generation !== this.tuneGeneration) return;
-      this.tuned = { channel, playlist: EXTENSION_ORIGIN + session.playlist };
+      this.tuned = { channel, playlist: EXTENSION_ORIGIN + session.playlist, session: session.id };
       this.player.play(this.tuned.playlist);
     } catch (error) {
       if (generation !== this.tuneGeneration) return;
@@ -165,7 +165,7 @@ class App {
     this.screen.lockSignal();
     this.screen.revealAfterRecovery();
     this.screen.hideCard();
-    if (this.tuned && !this.sound.isActive) this.sound.play(this.tuned.playlist);
+    if (this.tuned && !this.sound.isActive) this.sound.play(this.tuned.playlist, this.tuned.session);
   }
 
   private libraryChanged(): void {

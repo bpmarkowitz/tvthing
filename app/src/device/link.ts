@@ -1,5 +1,5 @@
 import type { HttpHeader, HttpMethod } from '@bridgething/client';
-import { EXTENSION_ORIGIN, type Health, type SessionReply, type SessionRequest } from '../shared/api';
+import { EXTENSION_ORIGIN, type Health, type HostTimeline, type SessionReply, type SessionRequest } from '../shared/api';
 import type { Transport } from './transport';
 
 export interface Response {
@@ -41,6 +41,16 @@ export class ExtensionLink {
   /** Starts a fresh stream for a channel; the reply's playlist is what both players load. */
   createSession(request: SessionRequest): Promise<SessionReply> {
     return this.call('POST', '/api/v1/sessions', request);
+  }
+
+  /** Where the host player's position counts from, once it has loaded the stream. */
+  hostTimeline(session: string): Promise<HostTimeline> {
+    return this.call('GET', `/api/v1/sessions/${session}/host`, undefined, 3_000);
+  }
+
+  /** Forgets where the host player started, before it loads the stream again. */
+  resetHostTimeline(session: string): Promise<HostTimeline> {
+    return this.call('DELETE', `/api/v1/sessions/${session}/host`, undefined, 3_000);
   }
 
   /** Sends a line to Bridgething's log on the computer. Never throws. */
