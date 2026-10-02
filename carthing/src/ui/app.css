@@ -23,6 +23,18 @@ html, body {
   user-select: none;
 }
 
+/* Picture framing, cycled by tapping the screen */
+#frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: #000;
+  transition: transform 0.25s ease;
+}
+/* Fill shows a 16:9 picture's 4:3 middle 640 px wide on the 800×480 screen; 800 / 640 = 1.25
+   fills it exactly, removing the side bars of 4:3 shows. */
+#frame.zoom { transform: scale(1.25); }
+
 video {
   position: absolute;
   inset: 0;
@@ -31,6 +43,7 @@ video {
   object-fit: cover;
   background: #000;
 }
+#frame.fit video { object-fit: contain; }
 
 /* Channel change: static while searching, the picture jittering under thinning static
    while it settles, then a quick roll and flash as it locks. */

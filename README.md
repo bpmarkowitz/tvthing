@@ -56,6 +56,7 @@ TV Thing doesn't come with content. It plays streams you add. Some places to loo
 | Buttons 1–4 while the guide is open | Save the highlighted channel to that button |
 | Front button | Mute or unmute; the picture keeps playing (closes the guide when it's open) |
 | Top-right button | Show what's on (five quick presses return to Bridgething's home) |
+| Tap the screen | Cycle the picture: Fill, Fit (whole picture), Zoom (removes the side bars of 4:3 shows); remembered per channel |
 
 **On the Mac:** the menu bar window shows what's on, favorites, the full lineup, volume, mute, and an audio delay control for fine-tuning lip sync. **Settings** has channel management, playback options (including CRT scanlines), a setup checklist, and a diagnostics log that includes messages from the Car Thing.
 

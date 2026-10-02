@@ -1,4 +1,5 @@
 import type { ChannelInfo, DisplayOptions } from '../mac';
+import { FramingControl } from './framing';
 import { TuningEffect } from './tuning';
 
 const BUG_DURATION_MS = 2_600;
@@ -16,6 +17,7 @@ function element<T extends HTMLElement>(id: string): T {
 /** On-screen overlays drawn above the video. The screen is otherwise just picture. */
 export class Screen {
   readonly video = element<HTMLVideoElement>('video');
+  readonly framing = new FramingControl(element('frame'));
   private readonly tuning = new TuningEffect(element<HTMLCanvasElement>('static'), this.video);
   private readonly bug = element('bug');
   private readonly card = element('card');

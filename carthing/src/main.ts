@@ -65,7 +65,11 @@ class App {
       info: () => this.showInfo(),
       discovered: (key, mapped) => this.link.log(`${mapped ? 'Key' : 'Unmapped key'}: ${JSON.stringify(key)}`),
     });
-    window.addEventListener('pointerdown', () => this.player.resume());
+    // Tapping the screen cycles the picture framing (fill, fit, zoom) for this channel.
+    window.addEventListener('pointerdown', () => {
+      this.player.resume();
+      this.screen.toast(this.screen.framing.cycle());
+    });
     window.addEventListener('error', (event) => this.link.log(`App error: ${event.message}`));
     // Leaving the app (home gesture, another app): tell the Mac to go quiet right away
     // instead of waiting for reports to stop.
@@ -129,7 +133,10 @@ class App {
     if (session.id !== this.sessionID) {
       this.sessionID = session.id;
       this.screen.startTuning();
-      if (state.channel) this.screen.showChannel(state.channel);
+      if (state.channel) {
+        this.screen.showChannel(state.channel);
+        this.screen.framing.setChannel(state.channel.id);
+      }
       this.player.play(MAC_ORIGIN + session.playlist);
     }
 
