@@ -15,9 +15,9 @@ const SETTLE_MS = 2_000;
  * A seek takes a moment to land, and the sound resumes from the requested point only then,
  * so seeks aim ahead by this much. It's learned from where each seek lands (and remembered).
  */
-const INITIAL_SEEK_LEAD_MS = 500;
-const MAXIMUM_SEEK_LEAD_MS = 3_000;
-const SEEK_LEAD_KEY = 'sound:seekLeadMs';
+const INITIAL_SEEK_LEAD_MS = 300;
+const MAXIMUM_SEEK_LEAD_MS = 1_500;
+const SEEK_LEAD_KEY = 'sound:seekLead';
 /** After a seek, a miss larger than this is corrected straight away (a few times at most). */
 const MISS_TOLERANCE_MS = 100;
 const QUICK_RETRIES = 2;

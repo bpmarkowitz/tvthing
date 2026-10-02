@@ -1,7 +1,7 @@
 {
   "id": "4ffeeef6-21be-405f-a187-93d4faface0d",
   "name": "TV Thing",
-  "version": "3.0.3",
+  "version": "3.0.4",
   "description": "A tiny TV for your Car Thing. Picture on the Car Thing, sound on your computer. Add channels in settings.",
   "icon": "icon.svg",
   "permissions": ["net.fetch", "audio"],

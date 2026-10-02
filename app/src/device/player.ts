@@ -138,8 +138,10 @@ export class Player {
       manifestLoadingMaxRetry: 4,
       levelLoadingMaxRetry: 4,
       fragLoadingMaxRetry: 5,
-      liveSyncDurationCount: 3,
-      liveMaxLatencyDurationCount: 8,
+      // The computer's player can't seek closer than about three segments to the live edge,
+      // so the picture stays four back, leaving the sound room to line up with it.
+      liveSyncDurationCount: 4,
+      liveMaxLatencyDurationCount: 10,
       // Ad splices leave small holes and mismatched track lengths; jump and stretch over
       // them, and nudge sooner and harder when playback stalls, instead of stopping.
       maxBufferHole: 0.6,
